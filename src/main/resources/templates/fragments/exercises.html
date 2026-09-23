@@ -1,0 +1,1 @@
+<th:block th:fragment="rows"><a class="exercise-row" th:each="e : ${exercises}" th:href="@{/exercise/{id}(id=${e.id})}"><span><strong th:text="${e.name}">Exercise</strong><small th:text="${e.primary_muscles} + ' · ' + ${e.equipment}">Muscles</small></span><span class="arrow">›</span></a><p class="muted" th:if="${#lists.isEmpty(exercises)}">No exercises found.</p></th:block>

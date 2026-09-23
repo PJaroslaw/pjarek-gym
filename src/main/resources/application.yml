@@ -1,0 +1,23 @@
+server:
+  port: 8080
+  servlet:
+    session:
+      cookie:
+        http-only: true
+        same-site: lax
+spring:
+  application:
+    name: pjarek-gym
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/gym}
+    username: ${SPRING_DATASOURCE_USERNAME:gym}
+    password: ${SPRING_DATASOURCE_PASSWORD:gym}
+  flyway:
+    enabled: true
+  thymeleaf:
+    cache: true
+app:
+  admin:
+    username: ${APP_ADMIN_USERNAME:}
+    password: ${APP_ADMIN_PASSWORD:}
+  exercise-image-dir: ${APP_EXERCISE_IMAGE_DIR:/tmp/pjarek-gym-exercise-images}
