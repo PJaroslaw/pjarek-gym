@@ -1,15 +1,17 @@
-package dev.pjarek.gym
+package com.pjarek.gym
 
-import org.springframework.beans.factory.annotation.Value
-import org.springframework.core.io.ClassPathResource
-import org.springframework.stereotype.Component
+import java.io.InputStream
+import java.io.OutputStream
 import java.nio.file.Files
 import java.nio.file.Path
 import java.nio.file.StandardCopyOption
 import java.util.zip.GZIPInputStream
+import org.springframework.beans.factory.annotation.Value
+import org.springframework.core.io.ClassPathResource
+import org.springframework.stereotype.Component
 
 @Component
-class ExerciseImageInstaller(@Value("\${app.exercise-image-dir:/tmp/pjarek-gym-exercise-images}") private val imageDir: String) {
+class ExerciseImageInstaller(@Value("\${app.exercise-image-dir}") private val imageDir: String) {
     fun install() {
         val root = Path.of(imageDir).toAbsolutePath().normalize()
         Files.createDirectories(root)
@@ -22,7 +24,7 @@ class ExerciseImageInstaller(@Value("\${app.exercise-image-dir:/tmp/pjarek-gym-e
                 val name = field(header, 0, 100)
                 val prefix = field(header, 345, 155)
                 val relative = if (prefix.isBlank()) name else "$prefix/$name"
-                val size = field(header, 124, 12).trim().toLongOrNull(8) ?: 0L
+                val size = field(header, 124, 12).trim().toLong(8)
                 val type = header[156].toInt().toChar()
                 if (type == '\u0000' || type == '0') {
                     if (relative.matches(Regex("exercises/[A-Za-z0-9_-]+/[0-3]\\.jpg")) && size in 1L..5_000_000L) {
@@ -56,7 +58,7 @@ class ExerciseImageInstaller(@Value("\${app.exercise-image-dir:/tmp/pjarek-gym-e
     private fun field(bytes: ByteArray, start: Int, length: Int): String =
         bytes.copyOfRange(start, start + length).takeWhile { it.toInt() != 0 }.toByteArray().toString(Charsets.UTF_8)
 
-    private fun copyExactly(input: java.io.InputStream, output: java.io.OutputStream, size: Long) {
+    private fun copyExactly(input: InputStream, output: OutputStream, size: Long) {
         val buffer = ByteArray(16 * 1024)
         var remaining = size
         while (remaining > 0) {

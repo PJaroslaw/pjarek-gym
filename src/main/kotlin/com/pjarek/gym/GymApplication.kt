@@ -1,4 +1,4 @@
-package dev.pjarek.gym
+package com.pjarek.gym
 
 import org.springframework.boot.autoconfigure.SpringBootApplication
 import org.springframework.boot.runApplication

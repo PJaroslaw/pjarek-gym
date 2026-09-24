@@ -1,17 +1,17 @@
-package dev.pjarek.gym
+package com.pjarek.gym
 
 import jakarta.servlet.http.HttpServletRequest
-import org.springframework.dao.EmptyResultDataAccessException
+import java.net.URI
 import org.springframework.dao.DataIntegrityViolationException
+import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.http.HttpStatus
+import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ControllerAdvice
 import org.springframework.web.bind.annotation.ExceptionHandler
 import org.springframework.web.bind.annotation.ResponseStatus
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException
 import org.springframework.web.servlet.mvc.support.RedirectAttributes
-import org.springframework.security.access.AccessDeniedException
-import java.net.URI
 
 @ControllerAdvice
 class FormErrorHandler {

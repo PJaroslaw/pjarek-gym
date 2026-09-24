@@ -3,6 +3,33 @@ if (!document.body.dataset.theme) {
 } else {
   localStorage.setItem('appearance', document.body.dataset.theme);
 }
+
+const mobileMenuButton = document.querySelector('.menu-toggle');
+const sidebar = document.querySelector('.sidebar');
+const closeMobileMenu = () => {
+  sidebar?.classList.remove('menu-open');
+  mobileMenuButton?.setAttribute('aria-expanded', 'false');
+  mobileMenuButton?.setAttribute('aria-label', 'Open navigation menu');
+};
+
+mobileMenuButton?.addEventListener('click', () => {
+  const isOpen = sidebar.classList.toggle('menu-open');
+  mobileMenuButton.setAttribute('aria-expanded', String(isOpen));
+  mobileMenuButton.setAttribute('aria-label', isOpen ? 'Close navigation menu' : 'Open navigation menu');
+  if (isOpen) sidebar.querySelector('nav a')?.focus();
+});
+
+sidebar?.querySelectorAll('nav a').forEach((link) => link.addEventListener('click', closeMobileMenu));
+document.addEventListener('keydown', (event) => {
+  if (event.key === 'Escape' && sidebar?.classList.contains('menu-open')) {
+    closeMobileMenu();
+    mobileMenuButton?.focus();
+  }
+});
+document.addEventListener('click', (event) => {
+  if (sidebar?.classList.contains('menu-open') && !sidebar.contains(event.target)) closeMobileMenu();
+});
+
 document.querySelector('#theme-mode')?.addEventListener('change', (event) => {
   const mode = event.target.value.toLowerCase();
   document.body.dataset.theme = mode;

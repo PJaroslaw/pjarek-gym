@@ -1,7 +1,5 @@
-package dev.pjarek.gym
+package com.pjarek.gym
 
-import tools.jackson.databind.JsonNode
-import tools.jackson.databind.json.JsonMapper
 import org.springframework.beans.factory.annotation.Value
 import org.springframework.boot.CommandLineRunner
 import org.springframework.core.io.ClassPathResource
@@ -9,6 +7,8 @@ import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.crypto.password.PasswordEncoder
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
+import tools.jackson.databind.JsonNode
+import tools.jackson.databind.json.JsonMapper
 
 @Component
 class Bootstrap(
@@ -21,8 +21,8 @@ class Bootstrap(
 ) : CommandLineRunner {
     @Transactional
     override fun run(vararg args: String) {
-        require(adminName.isNotBlank() && adminPassword.length >= 12) {
-            "Set APP_ADMIN_USERNAME and APP_ADMIN_PASSWORD (at least 12 characters) before starting the app"
+        require(adminName.isNotBlank() && adminPassword.isNotEmpty()) {
+            "Set APP_ADMIN_USERNAME and APP_ADMIN_PASSWORD before starting the app"
         }
         jdbc.update(
             "INSERT INTO app_user(username,password_hash,role) VALUES (?,?,'ADMIN') ON CONFLICT(username) DO NOTHING",
@@ -34,11 +34,12 @@ class Bootstrap(
     }
 
     private fun insertExercise(item: JsonNode) {
-        val id = item.path("id").asText(item.path("name").asText().replace(Regex("[^A-Za-z0-9]+"), "_"))
+        val id = item.path("id").asText()
+        require(id.isNotBlank()) { "Every exercise must have a source id" }
         jdbc.update(
             """INSERT INTO exercise(source_id,name,category,equipment,difficulty,force_type,mechanic,primary_muscles,secondary_muscles,instructions,image_paths)
                VALUES (?,?,?,?,?,?,?,?,?,?,?) ON CONFLICT(source_id) DO UPDATE SET name=excluded.name,category=excluded.category,equipment=excluded.equipment,
-               difficulty=excluded.difficulty,force_type=excluded.force_type,mechanic=excluded.mechanic,primary_muscles=excluded.primary_muscles,
+                difficulty=excluded.difficulty,force_type=excluded.force_type,mechanic=excluded.mechanic,primary_muscles=excluded.primary_muscles,
                secondary_muscles=excluded.secondary_muscles,instructions=excluded.instructions,image_paths=excluded.image_paths""".trimIndent(),
             id, item.path("name").asText(), item.path("category").asText(""), item.path("equipment").asText(""),
             item.path("level").asText(""), item.path("force").asText(""), item.path("mechanic").asText(""),

@@ -4,7 +4,7 @@ plugins {
     kotlin("plugin.spring") version "2.3.21"
 }
 
-group = "dev.pjarek"
+group = "com.pjarek"
 version = "0.1.0"
 
 java { toolchain { languageVersion = JavaLanguageVersion.of(25) } }

@@ -1,4 +1,4 @@
-package dev.pjarek.gym
+package com.pjarek.gym
 
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
