@@ -1,5 +1,6 @@
 services:
   app:
+    image: ghcr.io/pjaroslaw/pjarek-gym:latest
     build: .
     restart: unless-stopped
     depends_on:
@@ -13,7 +14,7 @@ services:
       APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:?Set APP_ADMIN_PASSWORD in .env}
       APP_EXERCISE_IMAGE_DIR: /app/exercise-images
     ports:
-      - "${APP_PORT:-8080}:8080"
+      - '${APP_PORT:-8080}:8080'
     volumes:
       - exercise_images:/app/exercise-images
   db:
@@ -26,7 +27,7 @@ services:
     volumes:
       - postgres_data:/var/lib/postgresql
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d gym"]
+      test: ['CMD-SHELL', 'pg_isready -U $${POSTGRES_USER} -d gym']
       interval: 5s
       timeout: 3s
       retries: 20

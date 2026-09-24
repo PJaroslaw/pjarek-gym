@@ -4,17 +4,26 @@ A self hosted gym log built with Kotlin, Spring Boot, Thymeleaf, HTMX, and Postg
 
 ## Run with Docker Compose
 
-Requirements: Docker Engine and the Docker Compose plugin.
+Requirements: Docker Engine and the Docker Compose plugin. The included [`compose.yaml`](compose.yaml) starts the application and PostgreSQL with persistent database and exercise-image volumes.
 
 ```sh
 cp .env.example .env
 ```
 
-Edit `.env` and replace the database and administrator passwords before starting. Then run:
+Edit `.env` and replace the database and administrator passwords before starting. To run the published GHCR image:
+
+```sh
+docker compose pull app
+docker compose up -d
+```
+
+To build and run the application from source instead:
 
 ```sh
 docker compose up --build -d
 ```
+
+The published GHCR package is public, so pulling the image does not require GHCR authentication.
 
 Open `http://localhost:8080` and sign in with `APP_ADMIN_USERNAME` and `APP_ADMIN_PASSWORD`. The first start imports the bundled Free Exercise DB catalog into PostgreSQL and extracts its bundled images into the persistent `exercise_images` volume. Startup does not require upstream access.
 
