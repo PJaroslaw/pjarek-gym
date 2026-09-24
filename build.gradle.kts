@@ -1,3 +1,5 @@
+import org.gradle.api.tasks.testing.logging.TestExceptionFormat
+
 plugins {
     id("org.springframework.boot") version "4.1.1"
     kotlin("jvm") version "2.3.21"
@@ -34,7 +36,13 @@ kotlin {
     compilerOptions { freeCompilerArgs.add("-Xannotation-default-target=param-property") }
 }
 
-tasks.withType<Test>().configureEach { useJUnitPlatform() }
+tasks.withType<Test>().configureEach {
+    useJUnitPlatform()
+    testLogging {
+        events("passed", "skipped", "failed")
+        exceptionFormat = TestExceptionFormat.FULL
+    }
+}
 
 tasks.named<Test>("test") {
     exclude("**/*IntegrationTest.class")
