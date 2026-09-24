@@ -1,1 +1,38 @@
-<main xmlns:th="http://www.thymeleaf.org"><div class="page-title"><div><span class="eyebrow">CONSISTENCY OVER COMPLEXITY</span><h1>Your routines</h1><p>Make a plan that helps you keep showing up.</p></div></div><section class="panel form-panel"><h2>Create a routine</h2><p class="field-error" role="alert" th:if="${formError}" th:text="${formError}"></p><form class="inline-form" method="post" action="/routines"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input name="name" placeholder="Routine name" required minlength="1" maxlength="160" pattern=".*\S.*" title="Enter at least one non-space character" th:value="${routineName}"><button class="button primary">Create routine</button></form></section><section class="routine-grid"><a class="routine-card" th:each="r:${routines}" th:href="@{/routines/{id}(id=${r.id})}"><span class="routine-mark">✳</span><h2 th:text="${r.name}">Routine name</h2><small>Open plan <span>→</span></small></a><div class="empty" th:if="${#lists.isEmpty(routines)}">Your first routine starts with a name above.</div></section></main>
+<main xmlns:th="http://www.thymeleaf.org">
+  <div class="page-title">
+    <div>
+      <span class="eyebrow">CONSISTENCY OVER COMPLEXITY</span>
+      <h1>Your routines</h1>
+      <p>Make a plan that helps you keep showing up.</p>
+    </div>
+  </div>
+  <section class="panel form-panel">
+    <h2>Create a routine</h2>
+    <p class="field-error" role="alert" th:if="${formError}" th:text="${formError}"></p>
+    <form class="inline-form" method="post" action="/routines">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <input
+        name="name"
+        placeholder="Routine name"
+        required
+        minlength="1"
+        maxlength="160"
+        pattern=".*\S.*"
+        title="Enter at least one non-space character"
+        th:value="${routineName}"
+      />
+      <button class="button primary">Create routine</button>
+    </form>
+  </section>
+  <section class="routine-grid">
+    <a class="routine-card" th:each="r:${routines}" th:href="@{/routines/{id}(id=${r.id})}">
+      <span class="routine-mark">✳</span>
+      <h2 th:text="${r.name}">Routine name</h2>
+      <small>
+        Open plan
+        <span>→</span>
+      </small>
+    </a>
+    <div class="empty" th:if="${#lists.isEmpty(routines)}">Your first routine starts with a name above.</div>
+  </section>
+</main>

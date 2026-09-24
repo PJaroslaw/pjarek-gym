@@ -1,1 +1,89 @@
-<main xmlns:th="http://www.thymeleaf.org"><a class="back-link" href="/admin/users">← All users</a><div class="page-title"><div><span class="eyebrow">USER ACCOUNT</span><h1 th:text="${account.username}">username</h1><p th:text="${account.role} + (${account.enabled} ? ' · Active' : ' · Disabled') + (${account.must_change_password} ? ' · Password change required' : '')">Role</p></div><form th:if="${account.username != username}" method="post" th:action="@{/admin/users/{id}/delete(id=${account.id})}" onsubmit="return confirm('Permanently delete this user and all of their routines, workouts, and sets? This cannot be undone.')"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="button danger">Delete user</button></form></div><div class="two-col"><section class="panel"><div class="section-heading"><div><span class="eyebrow">ROUTINE MANAGEMENT</span><h2>Routines</h2></div></div><div class="empty" th:if="${#lists.isEmpty(routines)}">No routines created.</div><div class="record-row" th:each="r:${routines}"><a th:href="@{/routines/{id}(id=${r.id})}"><strong th:text="${r.name}">Routine</strong></a><form method="post" th:action="@{/admin/routines/{id}/delete(id=${r.id})}" onsubmit="return confirm('Delete this routine?')"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="icon-button danger" title="Delete">×</button></form></div></section><section class="panel"><div class="section-heading"><div><span class="eyebrow">WORKOUT HISTORY</span><h2>Sessions</h2></div></div><div class="empty" th:if="${#lists.isEmpty(workouts)}">No workouts recorded.</div><div class="record-row" th:each="w:${workouts}"><a th:href="@{/workouts/{id}(id=${w.id})}"><strong th:text="${w.title}">Workout</strong><small th:text="${w.status} + ' · ' + ${w.started_at}">status</small></a><form method="post" th:action="@{/admin/workouts/{id}/delete(id=${w.id})}" onsubmit="return confirm('Delete this workout?')"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><button class="icon-button danger" title="Delete">×</button></form></div></section></div><section class="panel form-panel"><div class="section-heading"><div><span class="eyebrow">ACCOUNT ACCESS</span><h2>Reset password</h2></div></div><form class="inline-form" method="post" th:action="@{/admin/users/{id}/password(id=${account.id})}"><input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}"><input type="password" name="password" placeholder="New password" required><select name="temporaryPassword" aria-label="Password type"><option value="true">Temporary · require change at next login</option><option value="false">Permanent password</option></select><button class="button secondary">Reset password</button></form></section></main>
+<main xmlns:th="http://www.thymeleaf.org">
+  <a class="back-link" href="/admin/users">← All users</a>
+  <div class="page-title">
+    <div>
+      <span class="eyebrow">USER ACCOUNT</span>
+      <h1 th:text="${account.username}">username</h1>
+      <p
+        th:text="${account.role} + (${account.enabled} ? ' · Active' : ' · Disabled') + (${account.must_change_password} ? ' · Password change required' : '')"
+      >
+        Role
+      </p>
+    </div>
+    <form
+      th:if="${account.username != username}"
+      method="post"
+      th:action="@{/admin/users/{id}/delete(id=${account.id})}"
+      onsubmit="
+        return confirm(
+          'Permanently delete this user and all of their routines, workouts, and sets? This cannot be undone.',
+        );
+      "
+    >
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <button class="button danger">Delete user</button>
+    </form>
+  </div>
+  <div class="two-col">
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">ROUTINE MANAGEMENT</span>
+          <h2>Routines</h2>
+        </div>
+      </div>
+      <div class="empty" th:if="${#lists.isEmpty(routines)}">No routines created.</div>
+      <div class="record-row" th:each="r:${routines}">
+        <a th:href="@{/routines/{id}(id=${r.id})}"><strong th:text="${r.name}">Routine</strong></a>
+        <form
+          method="post"
+          th:action="@{/admin/routines/{id}/delete(id=${r.id})}"
+          onsubmit="return confirm('Delete this routine?');"
+        >
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+          <button class="icon-button danger" title="Delete">×</button>
+        </form>
+      </div>
+    </section>
+    <section class="panel">
+      <div class="section-heading">
+        <div>
+          <span class="eyebrow">WORKOUT HISTORY</span>
+          <h2>Sessions</h2>
+        </div>
+      </div>
+      <div class="empty" th:if="${#lists.isEmpty(workouts)}">No workouts recorded.</div>
+      <div class="record-row" th:each="w:${workouts}">
+        <a th:href="@{/workouts/{id}(id=${w.id})}">
+          <strong th:text="${w.title}">Workout</strong>
+          <small th:text="${w.status} + ' · ' + ${w.started_at}">status</small>
+        </a>
+        <form
+          method="post"
+          th:action="@{/admin/workouts/{id}/delete(id=${w.id})}"
+          onsubmit="return confirm('Delete this workout?');"
+        >
+          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+          <button class="icon-button danger" title="Delete">×</button>
+        </form>
+      </div>
+    </section>
+  </div>
+  <section class="panel form-panel">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">ACCOUNT ACCESS</span>
+        <h2>Reset password</h2>
+      </div>
+    </div>
+    <form class="inline-form" method="post" th:action="@{/admin/users/{id}/password(id=${account.id})}">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <input type="password" name="password" placeholder="New password" required />
+      <select name="temporaryPassword" aria-label="Password type">
+        <option value="true">Temporary · require change at next login</option>
+        <option value="false">Permanent password</option>
+      </select>
+      <button class="button secondary">Reset password</button>
+    </form>
+  </section>
+</main>

@@ -25,7 +25,7 @@ docker compose down
 docker volume ls
 ```
 
-Set `APP_PORT` to change the exposed web port. To create users, sign in as an admin and open **Manage users**. New accounts are invite-only. An admin can disable accounts and review or manage their routines and workouts. The Overview page lets each user choose kg or lb and a light, dark, or system appearance; system mode follows the device setting.
+Set `APP_PORT` to change the exposed web port. To create users, sign in as an admin and open **User administration**. New accounts are invite-only. Admins can manage accounts and review or manage users' routines and workouts. Personal settings, including weight units and light, dark, or system appearance, are available under **Settings**; system mode follows the device setting.
 
 ## Local development
 
@@ -41,6 +41,16 @@ export APP_ADMIN_PASSWORD='replace-with-a-long-password'
 ```
 
 The database schema is managed by Flyway. The application uses Spring Boot 4.1.1's BOM for runtime dependency versions; Kotlin Gradle plugins and Java toolchain are pinned separately. HTMX 4.0.0 is bundled locally under its Zero-Clause BSD license, so pages do not load it from a third-party CDN.
+
+### Formatting
+
+Formatting tools require Node.js 22.22.1 or newer and npm. Install the development dependencies from the repository root:
+
+```sh
+npm install
+```
+
+This installs the pre-commit hook. It formats staged HTML, JSON, JavaScript, Markdown, SQL, and YAML files while keeping unstaged edits out of the commit. Format HTML templates manually with `npm run format`, or format all supported files with `npm run format:all`.
 
 ## Tests
 

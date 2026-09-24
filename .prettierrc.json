@@ -1,0 +1,9 @@
+{
+  "plugins": ["prettier-plugin-sql"],
+  "language": "postgresql",
+  "printWidth": 120,
+  "tabWidth": 2,
+  "htmlWhitespaceSensitivity": "ignore",
+  "singleQuote": true,
+  "trailingComma": "all"
+}

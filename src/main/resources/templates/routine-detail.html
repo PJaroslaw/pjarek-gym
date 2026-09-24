@@ -1,1 +1,5 @@
-<!doctype html><html lang="en" xmlns:th="http://www.thymeleaf.org"><head th:replace="~{fragments/layout :: head(${routine.name})}"></head><body th:replace="~{fragments/layout :: shell('routines', ~{fragments/routine-detail-main :: main})}"></body></html>
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head th:replace="~{fragments/layout :: head(${routine.name})}"></head>
+  <body th:replace="~{fragments/layout :: shell('routines', ~{fragments/routine-detail-main :: main})}"></body>
+</html>
