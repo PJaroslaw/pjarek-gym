@@ -1,4 +1,4 @@
-# Repkeeper Gym
+# PJarek Gym Log
 
 A self hosted gym log built with Kotlin, Spring Boot, Thymeleaf, HTMX, and PostgreSQL. It supports user-owned workout routines, guided and ad hoc training sessions, set logging, exercise instructions, session history, and an admin area.
 
@@ -54,7 +54,11 @@ This installs the pre-commit hook. It formats staged HTML, JSON, JavaScript, Mar
 
 ## Tests
 
-Run `./gradlew test` with Java 25 and Docker available. Unit tests run locally; integration tests start an isolated PostgreSQL database with Testcontainers.
+Run unit tests with `./gradlew test`. Run PostgreSQL-backed integration tests separately with `./gradlew integrationTest`; they start an isolated database through Testcontainers and require Docker. `./gradlew check` runs both test tasks.
+
+## Continuous integration and releases
+
+GitHub Actions builds the application and runs unit and integration tests as separate jobs for pull requests and pushes to `main`. Push a semantic version tag such as `v1.0.0` to run the same verification and publish a signed `linux/amd64` container image to `ghcr.io/pjaroslaw/pjarek-gym`, then create a GitHub release with generated notes. Stable releases receive the `latest` image tag; prereleases do not. The weekly GHCR cleanup retains two untagged image versions. Docker Compose builds locally for the host architecture.
 
 ## Exercise data
 

@@ -34,4 +34,20 @@ kotlin {
     compilerOptions { freeCompilerArgs.add("-Xannotation-default-target=param-property") }
 }
 
-tasks.withType<Test> { useJUnitPlatform() }
+tasks.withType<Test>().configureEach { useJUnitPlatform() }
+
+tasks.named<Test>("test") {
+    exclude("**/*IntegrationTest.class")
+}
+
+tasks.register<Test>("integrationTest") {
+    description = "Runs the PostgreSQL-backed integration tests."
+    group = "verification"
+    testClassesDirs = sourceSets["test"].output.classesDirs
+    classpath = sourceSets["test"].runtimeClasspath
+    include("**/*IntegrationTest.class")
+}
+
+tasks.named("check") {
+    dependsOn("integrationTest")
+}

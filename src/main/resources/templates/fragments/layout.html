@@ -5,8 +5,9 @@
     <meta name="viewport" content="width=device-width,initial-scale=1" />
     <meta name="csrf-token" th:content="${_csrf.token}" />
     <meta name="csrf-header" th:content="${_csrf.headerName}" />
-    <title th:text="${title} + ' · Repkeeper'">Repkeeper</title>
-    <link rel="stylesheet" href="/assets/app.css?v=mobile-menu-1" />
+    <title th:text="${title} + ' · PJarek Gym Log'">PJarek Gym Log</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico?v=png-logo-1" />
+    <link rel="stylesheet" href="/assets/app.css?v=pjarek-brand-png-1" />
     <script defer src="/assets/htmx.min.js"></script>
     <script defer src="/assets/app.js?v=mobile-menu-1"></script>
   </head>
@@ -14,8 +15,11 @@
     <aside class="sidebar">
       <div class="sidebar-header">
         <a class="brand" href="/">
-          REPKEEPER
-          <span>GYM LOG</span>
+          <img class="brand-mark" src="/assets/pjarek-gym-log-mark.png" alt="" />
+          <span class="brand-copy">
+            <strong>PJarek</strong>
+            <span>GYM LOG</span>
+          </span>
         </a>
         <span class="user-dot mobile-user-dot" th:text="${#strings.substring(username,0,1)}">U</span>
         <button

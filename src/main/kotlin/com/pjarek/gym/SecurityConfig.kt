@@ -44,7 +44,7 @@ class SecurityConfig {
         return http
         .addFilterBefore(TemporaryPasswordFilter(jdbc), AuthorizationFilter::class.java)
         .authorizeHttpRequests { auth -> auth
-            .requestMatchers("/login", "/forbidden", "/assets/**", "/exercise-images/**", "/error").permitAll()
+            .requestMatchers("/login", "/forbidden", "/favicon.ico", "/assets/**", "/exercise-images/**", "/error").permitAll()
             .requestMatchers("/admin/**").hasRole("ADMIN")
             .anyRequest().authenticated()
         }
