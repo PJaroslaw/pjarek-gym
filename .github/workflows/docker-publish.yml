@@ -68,6 +68,6 @@ jobs:
 
       - name: Sign container image
         env:
-          IMAGE: ghcr.io/${{ github.repository }}
+          TAGS: ${{ steps.metadata.outputs.tags }}
           DIGEST: ${{ steps.image.outputs.digest }}
-        run: cosign sign --yes "${IMAGE}@${DIGEST}"
+        run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@"${DIGEST}"
