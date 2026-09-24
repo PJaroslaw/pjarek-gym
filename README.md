@@ -58,7 +58,7 @@ Run unit tests with `./gradlew test`. Run PostgreSQL-backed integration tests se
 
 ## Continuous integration and releases
 
-GitHub Actions builds the application and runs unit and integration tests as separate jobs for pull requests and pushes to `main`. Push a semantic version tag such as `v1.0.0` to run the same verification and publish a signed `linux/amd64` container image to `ghcr.io/pjaroslaw/pjarek-gym`, then create a GitHub release with generated notes. Stable releases receive the `latest` image tag; prereleases do not. The weekly GHCR cleanup retains two untagged image versions. Docker Compose builds locally for the host architecture.
+GitHub Actions builds the application and runs unit and integration tests as separate steps for pull requests. Pushes to `main` run the same verification before publishing a signed `linux/amd64` image to `ghcr.io/pjaroslaw/pjarek-gym` with `latest`, `main`, and short commit SHA tags. Push a semantic version tag such as `v1.0.0` to publish a signed versioned image and create a GitHub release with generated notes; stable releases also receive the `latest` tag, while prereleases do not. The weekly GHCR cleanup retains two untagged image versions. Docker Compose builds locally for the host architecture.
 
 ## Exercise data
 
