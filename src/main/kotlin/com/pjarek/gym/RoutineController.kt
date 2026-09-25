@@ -102,17 +102,16 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
         @AuthenticationPrincipal user: UserDetails,
         @RequestParam exerciseId: Long,
         @RequestParam sets: Int,
-        @RequestParam reps: String,
+        @RequestParam minReps: Int,
+        @RequestParam maxReps: Int,
         @RequestParam rest: Int
     ): String {
         access.ownedRoutine(id, access.ownerScope(user))
-        require(sets in 1..20 && rest in 0..900 && reps.isNotBlank() && reps.trim().length <= 40) {
-            "Use 1–20 sets, 0–900 seconds rest, and a rep target up to 40 characters."
-        }
+        validateExercisePlan(sets, minReps, maxReps, rest)
         require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=?", Int::class.java, exerciseId) == 1) { "Choose an exercise from the search results." }
         val updated = jdbc.update(
-            "UPDATE routine_item SET exercise_id=?,planned_sets=?,rep_target=?,rest_seconds=? WHERE id=? AND day_id IN (SELECT id FROM routine_day WHERE routine_id=?)",
-            exerciseId, sets, reps.trim(), rest, itemId, id
+            "UPDATE routine_item SET exercise_id=?,planned_sets=?,min_reps=?,max_reps=?,rest_seconds=? WHERE id=? AND day_id IN (SELECT id FROM routine_day WHERE routine_id=?)",
+            exerciseId, sets, minReps, maxReps, rest, itemId, id
         )
         require(updated == 1) { "Exercise not found in this routine." }
         return "redirect:/routines/$id"
@@ -121,12 +120,15 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
     @PostMapping("/routines/{id}/items")
     fun addRoutineItem(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails,
                        @RequestParam dayId: Long, @RequestParam exerciseId: Long,
-                       @RequestParam(defaultValue="3") sets: Int, @RequestParam(defaultValue="8-12") reps: String,
+                       @RequestParam(defaultValue="3") sets: Int,
+                       @RequestParam(defaultValue="8") minReps: Int,
+                       @RequestParam(defaultValue="12") maxReps: Int,
                        @RequestParam(defaultValue="90") rest: Int): String {
         access.ownedRoutine(id, access.ownerScope(user)); access.ownedDay(dayId, id)
-        require(sets in 1..20 && rest in 0..900 && reps.isNotBlank() && reps.length <= 40) { "Use 1–20 sets, 0–900 seconds rest, and a rep target up to 40 characters." }
+        validateExercisePlan(sets, minReps, maxReps, rest)
+        require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=?", Int::class.java, exerciseId) == 1) { "Choose an exercise from the search results." }
         val position = jdbc.queryForObject("SELECT coalesce(max(position),0)+1 FROM routine_item WHERE day_id=?", Int::class.java, dayId)!!
-        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,planned_sets,rep_target,rest_seconds) VALUES (?,?,?,?,?,?)", dayId, exerciseId, position, sets, reps.trim(), rest)
+        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,planned_sets,min_reps,max_reps,rest_seconds) VALUES (?,?,?,?,?,?,?)", dayId, exerciseId, position, sets, minReps, maxReps, rest)
         return "redirect:/routines/$id"
     }
 
@@ -136,8 +138,14 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
         val routineOwner = jdbc.queryForObject("SELECT owner_id FROM routine WHERE id=?", Long::class.java, routineId)!!
         val title = jdbc.queryForObject("SELECT name FROM routine_day WHERE id=?", String::class.java, dayId)!!
         val workout = jdbc.queryForObject("INSERT INTO workout(owner_id,routine_day_id,title) VALUES (?,?,?) RETURNING id", UUID::class.java, routineOwner, dayId, title)!!
-        jdbc.update("""INSERT INTO workout_exercise(workout_id,exercise_id,position,instructions_snapshot,planned_sets,rep_target,rest_seconds)
-            SELECT ?,ri.exercise_id,ri.position,e.instructions,ri.planned_sets,ri.rep_target,ri.rest_seconds FROM routine_item ri JOIN exercise e ON e.id=ri.exercise_id WHERE ri.day_id=? ORDER BY ri.position""", workout, dayId)
+        jdbc.update("""INSERT INTO workout_exercise(workout_id,exercise_id,position,instructions_snapshot,planned_sets,min_reps,max_reps,rest_seconds)
+            SELECT ?,ri.exercise_id,ri.position,e.instructions,ri.planned_sets,ri.min_reps,ri.max_reps,ri.rest_seconds FROM routine_item ri JOIN exercise e ON e.id=ri.exercise_id WHERE ri.day_id=? ORDER BY ri.position""", workout, dayId)
         return "redirect:/workouts/$workout"
+    }
+
+    private fun validateExercisePlan(sets: Int, minReps: Int, maxReps: Int, rest: Int) {
+        require(sets in 1..20 && minReps in 1..1000 && maxReps in minReps..1000 && rest in 0..900) {
+            "Use 1–20 sets, a rep range from 1–1,000 with the minimum no greater than the maximum, and 0–900 seconds rest."
+        }
     }
 }

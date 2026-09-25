@@ -7,9 +7,9 @@
     <meta name="csrf-header" th:content="${_csrf.headerName}" />
     <title th:text="${title} + ' · PJarek Gym Log'">PJarek Gym Log</title>
     <link rel="icon" type="image/x-icon" href="/favicon.ico?v=png-logo-1" />
-    <link rel="stylesheet" href="/assets/app.css?v=pjarek-brand-png-1" />
+    <link rel="stylesheet" href="/assets/app.css?v=theme-tokens-1" />
     <script defer src="/assets/htmx.min.js"></script>
-    <script defer src="/assets/app.js?v=mobile-menu-1"></script>
+    <script defer src="/assets/app.js?v=theme-tokens-1"></script>
   </head>
   <body th:fragment="shell(navActive,content)" th:attr="data-theme=${#strings.toLowerCase(themeMode)}">
     <aside class="sidebar">

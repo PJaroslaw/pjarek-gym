@@ -26,17 +26,20 @@ class RoutineIntegrationTest : IntegrationTestSupport() {
             .andExpect(status().isOk)
             .andExpect(content().string(containsString("Edit plan")))
             .andExpect(content().string(containsString("Incline Dumbbell Press")))
+            .andExpect(content().string(containsString("name=\"minReps\" min=\"1\" max=\"1000\"")))
+            .andExpect(content().string(containsString("name=\"maxReps\" min=\"1\" max=\"1000\"")))
 
         mockMvc.perform(post("/routines/$routineId/items/$itemId/edit")
-            .param("exerciseId", replacementExerciseId.toString()).param("sets", "5").param("reps", "6-8").param("rest", "150")
+            .param("exerciseId", replacementExerciseId.toString()).param("sets", "5").param("minReps", "6").param("maxReps", "8").param("rest", "150")
             .with(user("exercise-search-test")).with(csrf()))
             .andExpect(status().is3xxRedirection)
             .andExpect(redirectedUrl("/routines/$routineId"))
 
-        val item = jdbc.queryForMap("SELECT exercise_id,planned_sets,rep_target,rest_seconds FROM routine_item WHERE id=?", itemId)
+        val item = jdbc.queryForMap("SELECT exercise_id,planned_sets,min_reps,max_reps,rest_seconds FROM routine_item WHERE id=?", itemId)
         assertEquals(replacementExerciseId, (item["exercise_id"] as Number).toLong())
         assertEquals(5, item["planned_sets"])
-        assertEquals("6-8", item["rep_target"])
+        assertEquals(6, item["min_reps"])
+        assertEquals(8, item["max_reps"])
         assertEquals(150, item["rest_seconds"])
     }
 
@@ -64,7 +67,7 @@ class RoutineIntegrationTest : IntegrationTestSupport() {
 
         val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
         mockMvc.perform(post("/routines/$routineId/items").param("dayId", dayId.toString()).param("exerciseId", exerciseId.toString())
-            .param("sets", "4").param("reps", "6-8").param("rest", "120")
+            .param("sets", "4").param("minReps", "6").param("maxReps", "8").param("rest", "120")
             .with(user("exercise-search-test")).with(csrf()))
             .andExpect(status().is3xxRedirection)
         val itemId = jdbc.queryForObject("SELECT id FROM routine_item WHERE day_id=?", Long::class.java, dayId)!!
@@ -80,6 +83,34 @@ class RoutineIntegrationTest : IntegrationTestSupport() {
             .with(user("exercise-search-test")).with(csrf()))
             .andExpect(status().is3xxRedirection)
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM routine WHERE id=?", Int::class.java, routineId))
+    }
+
+    @Test
+    fun `routine item creation and editing reject invalid rep ranges without changing the plan`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", Long::class.java)!!
+        val routineId = jdbc.queryForObject("INSERT INTO routine(owner_id,name) VALUES (?, 'Range validation') RETURNING id", UUID::class.java, ownerId)!!
+        val dayId = jdbc.queryForObject("INSERT INTO routine_day(routine_id,name,position) VALUES (?, 'Day', 1) RETURNING id", Long::class.java, routineId)!!
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise LIMIT 1", Long::class.java)!!
+
+        listOf("0" to "8", "9" to "8", "8" to "1001").forEach { (minReps, maxReps) ->
+            mockMvc.perform(post("/routines/$routineId/items").param("dayId", dayId.toString())
+                .param("exerciseId", exerciseId.toString()).param("minReps", minReps).param("maxReps", maxReps)
+                .header("Referer", "http://localhost/routines/$routineId").with(user("exercise-search-test")).with(csrf()))
+                .andExpect(status().is3xxRedirection)
+        }
+        mockMvc.perform(post("/routines/$routineId/items").param("dayId", dayId.toString())
+            .param("exerciseId", Long.MAX_VALUE.toString()).param("minReps", "8").param("maxReps", "12")
+            .header("Referer", "http://localhost/routines/$routineId").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM routine_item WHERE day_id=?", Int::class.java, dayId))
+
+        val itemId = jdbc.queryForObject("INSERT INTO routine_item(day_id,exercise_id,position) VALUES (?,?,1) RETURNING id", Long::class.java, dayId, exerciseId)!!
+        mockMvc.perform(post("/routines/$routineId/items/$itemId/edit").param("exerciseId", exerciseId.toString())
+            .param("sets", "3").param("minReps", "12").param("maxReps", "10").param("rest", "90")
+            .header("Referer", "http://localhost/routines/$routineId").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        assertEquals(8, jdbc.queryForObject("SELECT min_reps FROM routine_item WHERE id=?", Int::class.java, itemId))
+        assertEquals(12, jdbc.queryForObject("SELECT max_reps FROM routine_item WHERE id=?", Int::class.java, itemId))
     }
 
     @Test

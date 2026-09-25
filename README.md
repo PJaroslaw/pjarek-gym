@@ -1,6 +1,6 @@
 # PJarek Gym Log
 
-A self hosted gym log built with Kotlin, Spring Boot, Thymeleaf, HTMX, and PostgreSQL. It supports user-owned workout routines, guided and ad hoc training sessions, set logging, exercise instructions, session history, and an admin area.
+A self hosted gym log built with Kotlin, Spring Boot, Thymeleaf, HTMX, and PostgreSQL. It supports user-owned workout routines with rep ranges, guided and ad hoc training sessions, set logging, workout and rest timers, exercise instructions, session history, and an admin area.
 
 ## Run with Docker Compose
 
