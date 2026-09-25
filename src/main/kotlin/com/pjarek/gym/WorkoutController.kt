@@ -19,14 +19,14 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
     fun startAdHoc(@AuthenticationPrincipal user: UserDetails, @RequestParam(required = false) exerciseId: Long?): String {
         val owner = access.userId(user)
         if (exerciseId != null) {
-            require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=?", Int::class.java, exerciseId) == 1) {
+            require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=? AND active=TRUE", Int::class.java, exerciseId) == 1) {
                 "Choose an exercise from the library."
             }
         }
         val workout = jdbc.queryForObject("INSERT INTO workout(owner_id,title) VALUES (?,'Ad hoc workout') RETURNING id", UUID::class.java, owner)!!
         if (exerciseId == null) return "redirect:/workouts/$workout"
         val itemId = jdbc.query(
-            "INSERT INTO workout_exercise(workout_id,exercise_id,position,instructions_snapshot) SELECT ?,id,1,instructions FROM exercise WHERE id=? RETURNING id",
+            "INSERT INTO workout_exercise(workout_id,exercise_id,position,instructions_snapshot) SELECT ?,id,1,instructions FROM exercise WHERE id=? AND active=TRUE RETURNING id",
             { rs, _ -> rs.getLong(1) },
             workout,
             exerciseId
@@ -68,7 +68,7 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
         model.addAttribute("exerciseCount", items.size)
         model.addAttribute("previousExerciseId", items.getOrNull(currentIndex - 1)?.get("id"))
         model.addAttribute("nextExerciseId", items.getOrNull(currentIndex + 1)?.get("id"))
-        model.addAttribute("exercises", jdbc.queryForList("SELECT id,name FROM exercise ORDER BY name LIMIT 300"))
+        model.addAttribute("exercises", jdbc.queryForList("SELECT id,name FROM exercise WHERE active=TRUE ORDER BY name"))
         val storedSets = if (current == null) emptyList() else jdbc.queryForList("SELECT s.*,we.id AS item_id FROM workout_set s JOIN workout_exercise we ON we.id=s.workout_exercise_id WHERE we.id=? ORDER BY s.set_number", current["id"])
         val previousSets = if (current == null) emptyList() else jdbc.queryForList(
             """SELECT s.set_number,s.reps,s.weight,w.title,w.completed_at
@@ -108,7 +108,7 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
         access.ownedWorkout(id, access.ownerScope(user)); access.requireActive(id)
         val pos = jdbc.queryForObject("SELECT coalesce(max(position),0)+1 FROM workout_exercise WHERE workout_id=?", Int::class.java, id)!!
         val itemId = jdbc.query(
-            "INSERT INTO workout_exercise(workout_id,exercise_id,position,instructions_snapshot) SELECT ?,id,?,instructions FROM exercise WHERE id=? RETURNING id",
+            "INSERT INTO workout_exercise(workout_id,exercise_id,position,instructions_snapshot) SELECT ?,id,?,instructions FROM exercise WHERE id=? AND active=TRUE RETURNING id",
             { rs, _ -> rs.getLong(1) },
             id,
             pos,

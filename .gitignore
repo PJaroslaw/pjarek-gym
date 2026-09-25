@@ -26,6 +26,6 @@ replay_pid*
 
 .env
 .gradle/
+.kotlin/
 build/
 node_modules/
-!src/main/resources/exercise-images.tar.gz

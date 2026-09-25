@@ -108,7 +108,7 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
     ): String {
         access.ownedRoutine(id, access.ownerScope(user))
         validateExercisePlan(sets, minReps, maxReps, rest)
-        require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=?", Int::class.java, exerciseId) == 1) { "Choose an exercise from the search results." }
+        require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=? AND active=TRUE", Int::class.java, exerciseId) == 1) { "Choose an exercise from the search results." }
         val updated = jdbc.update(
             "UPDATE routine_item SET exercise_id=?,planned_sets=?,min_reps=?,max_reps=?,rest_seconds=? WHERE id=? AND day_id IN (SELECT id FROM routine_day WHERE routine_id=?)",
             exerciseId, sets, minReps, maxReps, rest, itemId, id
@@ -126,7 +126,7 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
                        @RequestParam(defaultValue="90") rest: Int): String {
         access.ownedRoutine(id, access.ownerScope(user)); access.ownedDay(dayId, id)
         validateExercisePlan(sets, minReps, maxReps, rest)
-        require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=?", Int::class.java, exerciseId) == 1) { "Choose an exercise from the search results." }
+        require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=? AND active=TRUE", Int::class.java, exerciseId) == 1) { "Choose an exercise from the search results." }
         val position = jdbc.queryForObject("SELECT coalesce(max(position),0)+1 FROM routine_item WHERE day_id=?", Int::class.java, dayId)!!
         jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,planned_sets,min_reps,max_reps,rest_seconds) VALUES (?,?,?,?,?,?,?)", dayId, exerciseId, position, sets, minReps, maxReps, rest)
         return "redirect:/routines/$id"

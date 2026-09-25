@@ -21,3 +21,8 @@ app:
     username: ${APP_ADMIN_USERNAME:}
     password: ${APP_ADMIN_PASSWORD:}
   exercise-image-dir: ${APP_EXERCISE_IMAGE_DIR:/tmp/pjarek-gym-exercise-images}
+  exercise-sync:
+    url: ${APP_EXERCISE_SYNC_URL:https://codeload.github.com/yuhonas/free-exercise-db/zip/refs/heads/main}
+    cron: ${APP_EXERCISE_SYNC_CRON:0 0 4 * * SUN}
+    zone: ${APP_EXERCISE_SYNC_ZONE:UTC}
+    on-startup: ${APP_EXERCISE_SYNC_ON_STARTUP:true}

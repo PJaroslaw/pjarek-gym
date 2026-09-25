@@ -84,6 +84,7 @@ class SchemaUpgradeIntegrationTest {
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_name IN ('routine_item','workout_exercise') AND column_name='rep_target'", Int::class.java))
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM information_schema.columns WHERE table_name='workout_set' AND column_name='weight_unit'", Int::class.java))
         assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM workout WHERE status IN ('PAUSED','COMPLETED') AND active_since IS NOT NULL", Int::class.java))
+        assertEquals(true, jdbc.queryForObject("SELECT active FROM exercise WHERE id=?", Boolean::class.java, exerciseId))
     }
 
     private fun insertWorkout(jdbc: JdbcTemplate, ownerId: Long, status: String, startedAt: Instant): UUID {
