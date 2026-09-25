@@ -12,7 +12,7 @@
       onsubmit="return confirm('Delete this routine?');"
     >
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-      <button class="button danger">Delete routine</button>
+      <button class="button danger-strong">Delete routine</button>
     </form>
   </div>
   <form class="panel inline-form rename-form" method="post" th:action="@{/routines/{id}/rename(id=${routine.id})}">
@@ -49,7 +49,7 @@
             onsubmit="return confirm('Delete this day and its planned exercises? Completed workouts will remain.');"
           >
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <button class="button danger small">Delete day</button>
+            <button class="button danger-strong small">Delete day</button>
           </form>
         </div>
       </div>
@@ -57,7 +57,7 @@
         <span>
           <strong th:text="${item.exercise_name}">Exercise</strong>
           <small
-            th:text="${item.planned_sets} + ' sets · ' + ${item.rep_target} + ' reps · ' + ${item.rest_seconds} + 's rest'"
+            th:text="${item.planned_sets} + ' sets · ' + ${item.min_reps} + '–' + ${item.max_reps} + ' reps · ' + ${item.rest_seconds} + 's rest'"
           >
             3 sets
           </small>
@@ -88,14 +88,18 @@
                 </div>
               </div>
             </label>
-            <div class="three-inputs">
+            <div class="three-inputs rep-range-inputs">
               <label>
                 Sets
                 <input type="number" name="sets" min="1" max="20" th:value="${item.planned_sets}" required />
               </label>
               <label>
-                Rep target
-                <input name="reps" maxlength="40" th:value="${item.rep_target}" required />
+                Min reps
+                <input type="number" name="minReps" min="1" max="1000" th:value="${item.min_reps}" required />
+              </label>
+              <label>
+                Max reps
+                <input type="number" name="maxReps" min="1" max="1000" th:value="${item.max_reps}" required />
               </label>
               <label>
                 Rest sec
@@ -111,7 +115,7 @@
           onsubmit="return confirm('Remove this exercise from the routine?');"
         >
           <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-          <button class="icon-button danger" title="Remove exercise">×</button>
+          <button class="icon-button danger-strong" title="Remove exercise">×</button>
         </form>
       </div>
       <form class="add-item-form" method="post" th:action="@{/routines/{id}/items(id=${routine.id})}">
@@ -134,14 +138,18 @@
             </div>
           </div>
         </label>
-        <div class="three-inputs">
+        <div class="three-inputs rep-range-inputs">
           <label>
             Sets
             <input type="number" name="sets" min="1" max="20" value="3" required />
           </label>
           <label>
-            Rep target
-            <input name="reps" value="8-12" maxlength="40" required />
+            Min reps
+            <input type="number" name="minReps" min="1" max="1000" value="8" required />
+          </label>
+          <label>
+            Max reps
+            <input type="number" name="maxReps" min="1" max="1000" value="12" required />
           </label>
           <label>
             Rest sec

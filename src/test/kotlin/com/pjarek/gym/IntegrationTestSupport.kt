@@ -12,7 +12,7 @@ import org.springframework.test.context.DynamicPropertySource
 import org.springframework.test.web.servlet.MockMvc
 import org.testcontainers.containers.PostgreSQLContainer
 
-@SpringBootTest(properties = ["app.admin.username=integration-admin", "app.admin.password=IntegrationTestPass123!"])
+@SpringBootTest(properties = ["app.admin.username=integration-admin", "app.admin.password=IntegrationTestPass123!", "app.exercise-sync.on-startup=false", "app.exercise-sync.cron=-"])
 @AutoConfigureMockMvc
 abstract class IntegrationTestSupport {
     @Autowired protected lateinit var mockMvc: MockMvc

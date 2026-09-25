@@ -10,7 +10,7 @@ class ExerciseSearchService(private val jdbc: JdbcTemplate) {
         if (term.length < 2) return emptyList()
         require(term.length <= 100) { "Search terms can be up to 100 characters." }
         return jdbc.queryForList(
-            "SELECT id,name FROM exercise WHERE name ILIKE ? ORDER BY name LIMIT 100",
+            "SELECT id,name FROM exercise WHERE active=TRUE AND name ILIKE ? ORDER BY name LIMIT 100",
             "%$term%"
         )
     }

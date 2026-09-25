@@ -19,6 +19,7 @@
       <p class="instructions" th:text="${exercise.instructions}">Instruction</p>
       <form method="post" action="/workouts/ad-hoc">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <input type="hidden" name="exerciseId" th:value="${exercise.id}" />
         <button class="button primary">Start quick workout</button>
       </form>
     </div>

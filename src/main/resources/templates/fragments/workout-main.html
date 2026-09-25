@@ -7,32 +7,53 @@
       <p>Follow one movement and one set at a time.</p>
     </div>
     <div class="workout-page-actions" th:if="${workout.status != 'COMPLETED'}">
+      <form method="post" th:action="@{/workouts/{id}/finish(id=${workout.id})}" data-finish-workout>
+        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <button class="button primary">Finish workout ✓</button>
+      </form>
+    </div>
+  </header>
+  <section class="workout-timers">
+    <div
+      class="workout-clock-panel"
+      data-workout-clock
+      th:attr="data-workout-id=${workout.id},data-status=${workout.status},data-elapsed-seconds=${workoutElapsedSeconds}"
+    >
+      <div>
+        <span class="eyebrow" th:text="${workout.status == 'COMPLETED' ? 'TOTAL WORKOUT TIME' : 'WORKOUT TIME'}">
+          WORKOUT TIME
+        </span>
+        <strong class="workout-clock-value" data-workout-clock-value>00:00</strong>
+        <span class="timer-state" th:if="${workout.status == 'PAUSED'}">Paused</span>
+        <span class="timer-state" th:if="${workout.status == 'COMPLETED'}">Saved with this workout</span>
+      </div>
       <form
         th:if="${workout.status == 'IN_PROGRESS'}"
         method="post"
         th:action="@{/workouts/{id}/pause(id=${workout.id})}"
       >
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-        <button class="button secondary">Ⅱ Pause</button>
+        <button class="button secondary timer-control">Ⅱ Pause workout</button>
       </form>
       <form th:if="${workout.status == 'PAUSED'}" method="post" th:action="@{/workouts/{id}/resume(id=${workout.id})}">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-        <button class="button secondary">▶ Resume</button>
-      </form>
-      <form method="post" th:action="@{/workouts/{id}/finish(id=${workout.id})}">
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-        <button class="button primary">Finish workout ✓</button>
+        <button class="button secondary timer-control">▶ Resume workout</button>
       </form>
     </div>
-    <form
-      method="post"
-      th:action="@{/workouts/{id}/delete(id=${workout.id},returnTo='overview')}"
-      onsubmit="return confirm('Delete this workout and all logged sets? This cannot be undone.');"
+    <div
+      class="rest-timer-panel"
+      data-rest-timer
+      th:if="${workout.status != 'COMPLETED'}"
+      th:attr="data-workout-id=${workout.id},data-rest-remaining-millis=${restRemainingMillis}"
+      hidden
     >
-      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-      <button class="button danger">Delete workout</button>
-    </form>
-  </header>
+      <div>
+        <span class="eyebrow">REST TIME</span>
+        <strong data-rest-countdown>00:00</strong>
+      </div>
+      <button class="button secondary timer-control" type="button" data-cancel-rest>Cancel rest timer</button>
+    </div>
+  </section>
   <div class="paused-banner" th:if="${workout.status == 'PAUSED'}">
     Workout paused. Resume when you’re ready to continue.
   </div>
@@ -87,10 +108,6 @@
           <input type="hidden" name="direction" value="down" />
           <button class="icon-button" title="Move exercise later">↓</button>
         </form>
-        <button class="button timer" type="button" th:attr="data-seconds=${currentItem.rest_seconds}">
-          ⏱ Rest
-          <span th:text="${currentItem.rest_seconds} + 's'">90s</span>
-        </button>
       </div>
     </div>
 
@@ -106,7 +123,7 @@
         <p th:text="${currentItem.instructions_snapshot}">Follow controlled form.</p>
         <small
           th:if="${currentItem.planned_sets > 0}"
-          th:text="'Plan: ' + ${currentItem.planned_sets} + ' sets · ' + ${currentItem.rep_target} + ' reps'"
+          th:text="'Plan: ' + ${currentItem.planned_sets} + ' sets · ' + ${currentItem.min_reps} + '–' + ${currentItem.max_reps} + ' reps'"
         >
           Plan
         </small>
@@ -125,7 +142,7 @@
       <div class="set-row" th:each="s:${sets}">
         <span class="set-count" th:text="${s.set_number}">1</span>
         <span th:text="${s.reps}">10</span>
-        <span th:text="|${s.weight} ${s.weight_unit}|">20 kg</span>
+        <span th:text="|${s.displayWeight} ${weightUnit}|">20 kg</span>
         <span class="done-mark">✓</span>
         <span class="set-actions" th:if="${workout.status == 'IN_PROGRESS'}">
           <details class="set-edit">
@@ -143,10 +160,18 @@
               <label>
                 <span class="field-label">
                   Weight (
-                  <span th:text="${s.weight_unit}">KG</span>
+                  <span th:text="${weightUnit}">KG</span>
                   )
                 </span>
-                <input type="number" name="weight" min="0" max="2000" step="0.25" th:value="${s.weight}" required />
+                <input
+                  type="number"
+                  name="weight"
+                  min="0"
+                  max="2000"
+                  th:attr="step=${weightStep}"
+                  th:value="${s.displayWeight}"
+                  required
+                />
               </label>
               <button class="button secondary small">Save set</button>
             </form>
@@ -157,7 +182,11 @@
             onsubmit="return confirm('Delete this set? Remaining sets will be renumbered.');"
           >
             <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <button class="icon-button danger" title="Delete set" th:attr="aria-label='Delete set ' + ${s.set_number}">
+            <button
+              class="icon-button danger-strong"
+              title="Delete set"
+              th:attr="aria-label='Delete set ' + ${s.set_number}"
+            >
               ×
             </button>
           </form>
@@ -176,7 +205,7 @@
       <div class="previous-set-row" th:each="s:${previousSets}">
         <span th:text="'Set ' + ${s.set_number}">Set 1</span>
         <span th:text="${s.reps} + ' reps'">8 reps</span>
-        <span th:text="|${s.weight} ${s.weight_unit}|">20 KG</span>
+        <span th:text="|${s.displayWeight} ${weightUnit}|">20 KG</span>
       </div>
     </section>
 
@@ -190,7 +219,17 @@
       <input type="hidden" name="itemId" th:value="${currentItem.id}" />
       <label>
         Reps
-        <input type="number" name="reps" min="0" max="1000" step="1" inputmode="numeric" required autofocus />
+        <input
+          type="number"
+          name="reps"
+          min="0"
+          max="1000"
+          step="1"
+          inputmode="numeric"
+          th:value="${defaultReps}"
+          required
+          autofocus
+        />
       </label>
       <label>
         <span class="field-label">
@@ -198,7 +237,16 @@
           <span th:text="${weightUnit}">kg</span>
           )
         </span>
-        <input type="number" name="weight" min="0" max="2000" step="0.25" value="0" inputmode="decimal" required />
+        <input
+          type="number"
+          name="weight"
+          min="0"
+          max="2000"
+          th:attr="step=${weightStep}"
+          th:value="${defaultWeight}"
+          inputmode="decimal"
+          required
+        />
       </label>
       <button class="button primary">Log set ＋</button>
     </form>
@@ -223,6 +271,7 @@
         th:if="${nextExerciseId == null and workout.status != 'COMPLETED'}"
         method="post"
         th:action="@{/workouts/{id}/finish(id=${workout.id})}"
+        data-finish-workout
       >
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <button class="button primary">Finish workout ✓</button>
@@ -241,5 +290,14 @@
       <button class="button secondary">＋ Add</button>
     </form>
   </details>
-  <button class="button secondary small" type="button" id="timer-stop" hidden>Stop timer</button>
+  <section class="workout-danger-zone">
+    <form
+      method="post"
+      th:action="@{/workouts/{id}/delete(id=${workout.id},returnTo='overview')}"
+      onsubmit="return confirm('Delete this workout and all logged sets? This cannot be undone.');"
+    >
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <button class="button danger-strong">Delete workout</button>
+    </form>
+  </section>
 </main>

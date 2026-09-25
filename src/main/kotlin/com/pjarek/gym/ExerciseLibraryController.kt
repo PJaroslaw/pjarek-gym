@@ -20,7 +20,7 @@ class ExerciseLibraryController(private val jdbc: JdbcTemplate, private val exer
         require(q.length <= 100) { "Search terms can be up to 100 characters." }
         val term = "%${q.trim()}%"
         model.addAttribute("q", q)
-        model.addAttribute("exercises", jdbc.queryForList("SELECT id,name,category,equipment,primary_muscles,source_id FROM exercise WHERE name ILIKE ? OR primary_muscles ILIKE ? OR equipment ILIKE ? ORDER BY name LIMIT 200", term, term, term))
+        model.addAttribute("exercises", jdbc.queryForList("SELECT id,name,category,equipment,primary_muscles,source_id FROM exercise WHERE active=TRUE AND (name ILIKE ? OR primary_muscles ILIKE ? OR equipment ILIKE ?) ORDER BY name LIMIT 200", term, term, term))
         return if (hx != null) "fragments/exercises :: rows" else "exercises"
     }
 
@@ -41,9 +41,11 @@ class ExerciseLibraryController(private val jdbc: JdbcTemplate, private val exer
         Files.createDirectories(base)
         val path = jdbc.query("SELECT image_paths FROM exercise WHERE source_id=?", { rs, _ -> rs.getString(1) }, sourceId).firstOrNull()?.split(',')?.getOrNull(index)
         if (path == null || !path.matches(Regex("[A-Za-z0-9_-]+/[0-3]\\.jpg"))) { response.sendError(404); return }
-        val image = base.resolve("exercises/$path").normalize()
-        if (!image.startsWith(base)) { response.sendError(404); return }
-        if (!Files.exists(image)) { response.sendError(404); return }
+        val currentImage = base.resolve("current/exercises/$path").normalize()
+        val legacyImage = base.resolve("exercises/$path").normalize()
+        if (!currentImage.startsWith(base) || !legacyImage.startsWith(base)) { response.sendError(404); return }
+        val image = currentImage.takeIf { Files.isRegularFile(it) } ?: legacyImage
+        if (!Files.isRegularFile(image)) { response.sendError(404); return }
         response.contentType = "image/jpeg"
         Files.newInputStream(image).use { it.copyTo(response.outputStream) }
     }

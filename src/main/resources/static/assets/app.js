@@ -36,27 +36,95 @@ document.querySelector('#theme-mode')?.addEventListener('change', (event) => {
   localStorage.setItem('appearance', mode);
 });
 
-document.addEventListener('click', (event) => {
-  const button = event.target.closest('[data-seconds]');
-  if (!button) return;
-  if (window.restInterval) clearInterval(window.restInterval);
-  const label = button.querySelector('span');
-  const total = Number(button.dataset.seconds) || 0;
-  if (!total) return;
-  let left = total;
-  button.classList.add('running');
-  const tick = () => {
-    label.textContent = `${left}s`;
-    if (left <= 0) {
-      clearInterval(window.restInterval);
-      button.classList.remove('running');
-      label.textContent = 'Done';
+document.querySelectorAll('.rep-range-inputs').forEach((fields) => {
+  const minReps = fields.querySelector('input[name="minReps"]');
+  const maxReps = fields.querySelector('input[name="maxReps"]');
+  const validateRange = () => {
+    const invalidRange = minReps.value !== '' && maxReps.value !== '' && Number(minReps.value) > Number(maxReps.value);
+    maxReps.setCustomValidity(invalidRange ? 'Maximum reps must be at least the minimum reps.' : '');
+  };
+
+  minReps.addEventListener('input', validateRange);
+  maxReps.addEventListener('input', validateRange);
+  const form = fields.closest('form');
+  form.addEventListener('submit', (event) => {
+    validateRange();
+    if (maxReps.validationMessage) {
+      event.preventDefault();
+      maxReps.reportValidity();
+    }
+  });
+});
+
+const formatClock = (totalSeconds) => {
+  const hours = Math.floor(totalSeconds / 3600);
+  const minutes = Math.floor((totalSeconds % 3600) / 60);
+  const seconds = totalSeconds % 60;
+  const pad = (value) => String(value).padStart(2, '0');
+  return hours > 0 ? `${pad(hours)}:${pad(minutes)}:${pad(seconds)}` : `${pad(minutes)}:${pad(seconds)}`;
+};
+
+const workoutClock = document.querySelector('[data-workout-clock]');
+if (workoutClock) {
+  const display = workoutClock.querySelector('[data-workout-clock-value]');
+  const elapsedAtLoad = Number(workoutClock.dataset.elapsedSeconds);
+  const isRunning = workoutClock.dataset.status === 'IN_PROGRESS';
+  const loadedAt = Date.now();
+  const updateWorkoutClock = () => {
+    const elapsed = elapsedAtLoad + (isRunning ? Math.floor((Date.now() - loadedAt) / 1000) : 0);
+    display.textContent = formatClock(elapsed);
+  };
+  updateWorkoutClock();
+  if (isRunning) window.setInterval(updateWorkoutClock, 1000);
+}
+
+const restTimer = document.querySelector('[data-rest-timer]');
+if (restTimer) {
+  const workoutId = restTimer.dataset.workoutId;
+  const storageKey = `workout-rest-timer:${workoutId}`;
+  const url = new URL(window.location.href);
+  const remainingMillis = Number(restTimer.dataset.restRemainingMillis);
+  if (url.searchParams.has('restStartedAt')) {
+    if (remainingMillis > 0) {
+      localStorage.setItem(storageKey, JSON.stringify({ expiresAt: Date.now() + remainingMillis }));
+    } else {
+      localStorage.removeItem(storageKey);
+    }
+    url.searchParams.delete('restSeconds');
+    url.searchParams.delete('restStartedAt');
+    window.history.replaceState({}, '', url);
+  }
+
+  const countdown = restTimer.querySelector('[data-rest-countdown]');
+  const cancelButton = restTimer.querySelector('[data-cancel-rest]');
+  const updateRestTimer = () => {
+    const timer = JSON.parse(localStorage.getItem(storageKey) || 'null');
+    if (!timer) {
+      restTimer.hidden = true;
       return;
     }
-    left -= 1;
+    const remaining = Math.ceil((timer.expiresAt - Date.now()) / 1000);
+    if (remaining <= 0) {
+      localStorage.removeItem(storageKey);
+      restTimer.hidden = true;
+      return;
+    }
+    restTimer.hidden = false;
+    countdown.textContent = formatClock(remaining);
   };
-  tick();
-  window.restInterval = setInterval(tick, 1000);
+  cancelButton.addEventListener('click', () => {
+    localStorage.removeItem(storageKey);
+    restTimer.hidden = true;
+  });
+  updateRestTimer();
+  window.setInterval(updateRestTimer, 250);
+}
+
+document.querySelectorAll('[data-finish-workout]').forEach((form) => {
+  form.addEventListener('submit', () => {
+    const workoutId = workoutClock?.dataset.workoutId;
+    if (workoutId) localStorage.removeItem(`workout-rest-timer:${workoutId}`);
+  });
 });
 
 document.querySelectorAll('[data-exercise-picker]').forEach((picker) => {
@@ -91,7 +159,7 @@ document.querySelectorAll('[data-exercise-picker]').forEach((picker) => {
     try {
       const response = await fetch(`/api/exercises/search?q=${encodeURIComponent(query)}`, {
         headers: { Accept: 'application/json' },
-        signal: activeRequest.signal
+        signal: activeRequest.signal,
       });
       if (!response.ok) throw new Error('Exercise search failed');
       const exercises = await response.json();

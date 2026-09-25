@@ -13,6 +13,10 @@ services:
       APP_ADMIN_USERNAME: ${APP_ADMIN_USERNAME:-admin}
       APP_ADMIN_PASSWORD: ${APP_ADMIN_PASSWORD:?Set APP_ADMIN_PASSWORD in .env}
       APP_EXERCISE_IMAGE_DIR: /app/exercise-images
+      APP_EXERCISE_SYNC_CRON: ${APP_EXERCISE_SYNC_CRON:-0 0 4 * * SUN}
+      APP_EXERCISE_SYNC_ZONE: ${APP_EXERCISE_SYNC_ZONE:-UTC}
+      APP_EXERCISE_SYNC_ON_STARTUP: ${APP_EXERCISE_SYNC_ON_STARTUP:-true}
+      APP_EXERCISE_SYNC_URL: ${APP_EXERCISE_SYNC_URL:-https://codeload.github.com/yuhonas/free-exercise-db/zip/refs/heads/main}
     ports:
       - '${APP_PORT:-8080}:8080'
     volumes:
