@@ -1,0 +1,43 @@
+<main xmlns:th="http://www.thymeleaf.org">
+  <a class="back-link" th:href="@{/admin/users/{id}/inspect(id=${account.id})}">
+    ← Back to
+    <span th:text="${account.username}">user</span>
+  </a>
+  <div class="page-title">
+    <div>
+      <span class="eyebrow">READ-ONLY SESSION INSPECTION</span>
+      <h1 th:text="${workout.title}">Workout</h1>
+      <p>
+        <span th:text="${workout.status}">Status</span>
+        ·
+        <span th:text="${#dates.format(workout.started_at,'d MMM yyyy · HH:mm')}">Date</span>
+        ·
+        <span th:text="${workout.elapsed_seconds} + ' sec'">Duration</span>
+      </p>
+    </div>
+  </div>
+  <section class="panel">
+    <div class="empty" th:if="${#lists.isEmpty(workoutExercises)}">This session has no exercises.</div>
+    <article class="admin-inspect-day admin-inspect-detail-day" th:each="e:${workoutExercises}">
+      <h2 th:text="${e.exercise_name}">Exercise</h2>
+      <small
+        class="admin-inspect-plan"
+        th:if="${e.planned_sets > 0}"
+        th:text="'Plan: ' + ${e.planned_sets} + ' sets · ' + ${e.min_reps} + '–' + ${e.max_reps} + ' reps'"
+      >
+        Plan
+      </small>
+      <div class="admin-inspect-set-heading" th:if="${!#lists.isEmpty(sets.?[workout_exercise_id == #vars.e.id])}">
+        <span>SET</span>
+        <span>REPS</span>
+        <span>WEIGHT (KG)</span>
+      </div>
+      <div class="admin-inspect-set" th:each="s:${sets}" th:if="${s.workout_exercise_id == e.id}">
+        <span th:text="'Set ' + ${s.set_number}">Set</span>
+        <span th:text="${s.reps} + ' reps'">Reps</span>
+        <span th:text="${#numbers.formatDecimal(s.weight,1,2)} + ' kg'">Weight</span>
+      </div>
+      <small th:if="${#lists.isEmpty(sets.?[workout_exercise_id == #vars.e.id])}">No sets logged.</small>
+    </article>
+  </section>
+</main>

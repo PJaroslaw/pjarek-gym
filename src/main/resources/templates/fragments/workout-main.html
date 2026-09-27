@@ -1,10 +1,27 @@
 <main xmlns:th="http://www.thymeleaf.org">
-  <a class="back-link" href="/">← Dashboard</a>
+  <a
+    class="back-link"
+    th:href="${workout.status == 'COMPLETED' ? '/history' : '/'}"
+    th:text="${workout.status == 'COMPLETED' ? '← History' : '← Dashboard'}"
+  >
+    ← Dashboard
+  </a>
   <header class="workout-page-heading">
     <div>
       <span class="eyebrow" th:text="${workout.status}">IN PROGRESS</span>
       <h1 th:text="${workout.title}">Workout</h1>
-      <p>Follow one movement and one set at a time.</p>
+      <p
+        th:text="${workout.status == 'COMPLETED' ? 'Review all exercises and sets from this session.' : 'Follow one movement and one set at a time.'}"
+      >
+        Follow one movement and one set at a time.
+      </p>
+      <small
+        class="workout-completed-date"
+        th:if="${workout.status == 'COMPLETED'}"
+        th:text="'Completed ' + ${#dates.format(workout.completed_at,'d MMM yyyy · HH:mm')}"
+      >
+        Completed date
+      </small>
     </div>
     <div class="workout-page-actions" th:if="${workout.status != 'COMPLETED'}">
       <form method="post" th:action="@{/workouts/{id}/finish(id=${workout.id})}" data-finish-workout>
@@ -33,10 +50,12 @@
         th:action="@{/workouts/{id}/pause(id=${workout.id})}"
       >
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <input th:if="${currentItem != null}" type="hidden" name="exercise" th:value="${currentItem.id}" />
         <button class="button secondary timer-control">Ⅱ Pause workout</button>
       </form>
       <form th:if="${workout.status == 'PAUSED'}" method="post" th:action="@{/workouts/{id}/resume(id=${workout.id})}">
         <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+        <input th:if="${currentItem != null}" type="hidden" name="exercise" th:value="${currentItem.id}" />
         <button class="button secondary timer-control">▶ Resume workout</button>
       </form>
     </div>
@@ -58,20 +77,65 @@
     Workout paused. Resume when you’re ready to continue.
   </div>
 
-  <section class="panel empty" th:if="${currentItem == null}">
+  <section class="panel workout-session-summary" th:if="${workout.status == 'COMPLETED'}">
+    <div class="session-summary-volume">
+      <span class="eyebrow">TOTAL VOLUME</span>
+      <strong th:text="${#numbers.formatDecimal(sessionVolume,1,0)} + ' kg volume'">0 kg volume</strong>
+    </div>
+    <div class="empty" th:if="${#lists.isEmpty(sessionExercises)}">This session has no exercises.</div>
+    <article class="session-summary-exercise" th:each="e:${sessionExercises}">
+      <h2 th:text="${e.name}">Exercise</h2>
+      <small
+        class="session-summary-plan"
+        th:if="${e.planned_sets > 0}"
+        th:text="'Plan: ' + ${e.planned_sets} + ' sets · ' + ${e.min_reps} + '–' + ${e.max_reps} + ' reps'"
+      >
+        Plan
+      </small>
+      <div
+        class="session-summary-set-heading"
+        th:if="${!#lists.isEmpty(sessionSets.?[workout_exercise_id == #vars.e.id])}"
+      >
+        <span>SET</span>
+        <span>REPS</span>
+        <span th:text="'WEIGHT (' + ${weightUnit} + ')'">WEIGHT</span>
+      </div>
+      <div class="session-summary-set" th:each="s:${sessionSets}" th:if="${s.workout_exercise_id == e.id}">
+        <span th:text="${s.set_number}">1</span>
+        <span th:text="${s.reps}">8</span>
+        <span th:text="|${s.displayWeight} ${weightUnit}|">20 KG</span>
+      </div>
+      <small class="session-summary-empty" th:if="${#lists.isEmpty(sessionSets.?[workout_exercise_id == #vars.e.id])}">
+        No sets logged.
+      </small>
+    </article>
+  </section>
+
+  <section class="panel empty" th:if="${currentItem == null and workout.status != 'COMPLETED'}">
     <strong>No exercises in this workout yet.</strong>
     <p>Add an exercise below to get started.</p>
   </section>
 
-  <article class="panel workout-step" th:if="${currentItem != null}" th:id="'exercise-' + ${currentItem.id}">
+  <article
+    class="panel workout-step"
+    th:if="${currentItem != null and workout.status != 'COMPLETED'}"
+    th:id="'exercise-' + ${currentItem.id}"
+  >
     <div class="workout-step-topline">
       <span class="eyebrow" th:text="'EXERCISE ' + ${exerciseNumber} + ' OF ' + ${exerciseCount}">EXERCISE 1 OF 1</span>
       <span
         class="step-count"
-        th:if="${currentItem.planned_sets > 0}"
+        th:if="${currentItem.planned_sets > 0 and currentItem.completed_sets < currentItem.planned_sets}"
         th:text="'SET ' + ${currentItem.completed_sets + 1} + ' OF ' + ${currentItem.planned_sets}"
       >
         SET 1 OF 3
+      </span>
+      <span
+        class="step-count"
+        th:if="${currentItem.planned_sets > 0 and currentItem.completed_sets >= currentItem.planned_sets}"
+        th:text="${currentItem.planned_sets} + ' PLANNED SETS COMPLETE'"
+      >
+        PLANNED SETS COMPLETE
       </span>
       <span
         class="step-count"
@@ -89,46 +153,29 @@
           <span th:text="${currentItem.equipment}">Equipment</span>
         </div>
       </div>
-      <div class="action-row">
-        <form
-          th:if="${workout.status == 'IN_PROGRESS' and currentItem.position > 1}"
-          method="post"
-          th:action="@{/workouts/{id}/exercises/{itemId}/move(id=${workout.id},itemId=${currentItem.id})}"
-        >
-          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-          <input type="hidden" name="direction" value="up" />
-          <button class="icon-button" title="Move exercise earlier">↑</button>
-        </form>
-        <form
-          th:if="${workout.status == 'IN_PROGRESS' and currentItem.position < exerciseCount}"
-          method="post"
-          th:action="@{/workouts/{id}/exercises/{itemId}/move(id=${workout.id},itemId=${currentItem.id})}"
-        >
-          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-          <input type="hidden" name="direction" value="down" />
-          <button class="icon-button" title="Move exercise later">↓</button>
-        </form>
-      </div>
     </div>
 
-    <div class="instruction-box">
-      <img
-        th:if="${currentItem.source_id != null}"
-        th:src="@{/exercise-images/{id}/{i}(id=${currentItem.source_id},i=0)}"
-        alt=""
-        onerror="this.style.display = 'none'"
-      />
-      <div>
-        <span class="eyebrow">FORM NOTES</span>
-        <p th:text="${currentItem.instructions_snapshot}">Follow controlled form.</p>
-        <small
-          th:if="${currentItem.planned_sets > 0}"
-          th:text="'Plan: ' + ${currentItem.planned_sets} + ' sets · ' + ${currentItem.min_reps} + '–' + ${currentItem.max_reps} + ' reps'"
-        >
-          Plan
-        </small>
+    <details class="exercise-instructions">
+      <summary>Show exercise notes and image</summary>
+      <div class="instruction-box">
+        <img
+          th:if="${currentItem.source_id != null}"
+          th:src="@{/exercise-images/{id}/{i}(id=${currentItem.source_id},i=0)}"
+          alt=""
+          onerror="this.style.display = 'none'"
+        />
+        <div>
+          <span class="eyebrow">FORM NOTES</span>
+          <p th:text="${currentItem.instructions_snapshot}">Follow controlled form.</p>
+          <small
+            th:if="${currentItem.planned_sets > 0}"
+            th:text="'Plan: ' + ${currentItem.planned_sets} + ' sets · ' + ${currentItem.min_reps} + '–' + ${currentItem.max_reps} + ' reps'"
+          >
+            Plan
+          </small>
+        </div>
       </div>
-    </div>
+    </details>
 
     <section class="sets-table" th:if="${!#lists.isEmpty(sets)}">
       <h3>Completed sets</h3>
@@ -139,58 +186,61 @@
         <span>STATUS</span>
         <span th:if="${workout.status == 'IN_PROGRESS'}">ACTIONS</span>
       </div>
-      <div class="set-row" th:each="s:${sets}">
-        <span class="set-count" th:text="${s.set_number}">1</span>
-        <span th:text="${s.reps}">10</span>
-        <span th:text="|${s.displayWeight} ${weightUnit}|">20 kg</span>
-        <span class="done-mark">✓</span>
-        <span class="set-actions" th:if="${workout.status == 'IN_PROGRESS'}">
-          <details class="set-edit">
-            <summary class="button secondary small">Edit</summary>
+      <div class="set-record" th:each="s:${sets}">
+        <div class="set-row">
+          <span class="set-count" th:text="${s.set_number}">1</span>
+          <span th:text="${s.reps}">10</span>
+          <span th:text="|${s.displayWeight} ${weightUnit}|">20 kg</span>
+          <span class="done-mark">✓</span>
+          <span class="set-actions" th:if="${workout.status == 'IN_PROGRESS'}">
+            <details class="set-edit">
+              <summary class="button secondary small">Edit</summary>
+              <form
+                class="set-edit-form"
+                method="post"
+                th:action="@{/workouts/{id}/sets/{setId}/edit(id=${workout.id},setId=${s.id})}"
+              >
+                <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+                <label>
+                  Reps
+                  <input type="number" name="reps" min="0" max="1000" step="1" th:value="${s.reps}" required />
+                </label>
+                <label>
+                  <span class="field-label">
+                    Weight (
+                    <span th:text="${weightUnit}">KG</span>
+                    )
+                  </span>
+                  <input
+                    type="number"
+                    name="weight"
+                    min="0"
+                    max="2000"
+                    th:attr="step=${weightStep}"
+                    th:value="${s.displayWeight}"
+                    required
+                  />
+                </label>
+                <button class="button secondary small">Save set</button>
+              </form>
+            </details>
             <form
-              class="set-edit-form"
+              class="set-delete-action"
               method="post"
-              th:action="@{/workouts/{id}/sets/{setId}/edit(id=${workout.id},setId=${s.id})}"
+              th:action="@{/workouts/{id}/sets/{setId}/delete(id=${workout.id},setId=${s.id})}"
+              onsubmit="return confirm('Delete this set? Remaining sets will be renumbered.');"
             >
               <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-              <label>
-                Reps
-                <input type="number" name="reps" min="0" max="1000" step="1" th:value="${s.reps}" required />
-              </label>
-              <label>
-                <span class="field-label">
-                  Weight (
-                  <span th:text="${weightUnit}">KG</span>
-                  )
-                </span>
-                <input
-                  type="number"
-                  name="weight"
-                  min="0"
-                  max="2000"
-                  th:attr="step=${weightStep}"
-                  th:value="${s.displayWeight}"
-                  required
-                />
-              </label>
-              <button class="button secondary small">Save set</button>
+              <button
+                class="icon-button danger-strong"
+                title="Delete set"
+                th:attr="aria-label='Delete set ' + ${s.set_number}"
+              >
+                ×
+              </button>
             </form>
-          </details>
-          <form
-            method="post"
-            th:action="@{/workouts/{id}/sets/{setId}/delete(id=${workout.id},setId=${s.id})}"
-            onsubmit="return confirm('Delete this set? Remaining sets will be renumbered.');"
-          >
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-            <button
-              class="icon-button danger-strong"
-              title="Delete set"
-              th:attr="aria-label='Delete set ' + ${s.set_number}"
-            >
-              ×
-            </button>
-          </form>
-        </span>
+          </span>
+        </div>
       </div>
     </section>
 
@@ -248,7 +298,12 @@
           required
         />
       </label>
-      <button class="button primary">Log set ＋</button>
+      <button
+        class="button primary"
+        th:text="${currentItem.planned_sets > 0 and currentItem.completed_sets >= currentItem.planned_sets ? 'Log extra set ＋' : 'Log set ＋'}"
+      >
+        Log set ＋
+      </button>
     </form>
 
     <nav class="workout-step-nav" aria-label="Workout exercises">
@@ -293,7 +348,7 @@
   <section class="workout-danger-zone">
     <form
       method="post"
-      th:action="@{/workouts/{id}/delete(id=${workout.id},returnTo='overview')}"
+      th:action="@{/workouts/{id}/delete(id=${workout.id},returnTo=${workout.status == 'COMPLETED' ? 'history' : 'overview'})}"
       onsubmit="return confirm('Delete this workout and all logged sets? This cannot be undone.');"
     >
       <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />

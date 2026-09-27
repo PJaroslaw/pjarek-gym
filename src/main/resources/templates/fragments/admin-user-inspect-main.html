@@ -1,0 +1,98 @@
+<main xmlns:th="http://www.thymeleaf.org">
+  <a class="back-link" href="/admin/users">← All users</a>
+  <div class="page-title">
+    <div>
+      <span class="eyebrow">READ-ONLY INSPECTION</span>
+      <h1 th:text="${account.username}">username</h1>
+      <p>Review routines and workout history. Nothing on this page can be edited or deleted.</p>
+    </div>
+    <a class="button secondary" th:href="@{/admin/users/{id}(id=${account.id})}">Edit user</a>
+  </div>
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">TRAINING PLAN</span>
+        <h2>Routines</h2>
+      </div>
+      <span class="muted" th:text="${routineCount} + ' routines'">0 routines</span>
+    </div>
+    <div class="empty" th:if="${#lists.isEmpty(routines)}">This user has no routines.</div>
+    <a
+      class="admin-inspect-link-row"
+      th:each="r:${routines}"
+      th:href="@{/admin/users/{id}/inspect/routines/{routineId}(id=${account.id},routineId=${r.id})}"
+    >
+      <span>
+        <strong th:text="${r.name}">Routine name</strong>
+        <small th:text="${r.day_count} + ' days · ' + ${r.exercise_count} + ' exercises'">Routine details</small>
+      </span>
+      <span class="admin-inspect-open">View routine →</span>
+    </a>
+    <nav
+      class="admin-inspect-pagination"
+      aria-label="Routine pages"
+      th:if="${hasPreviousRoutinePage or hasNextRoutinePage}"
+    >
+      <a
+        class="button secondary small"
+        th:if="${hasPreviousRoutinePage}"
+        th:href="@{/admin/users/{id}/inspect(id=${account.id},routinesPage=${routinesPage - 1})}"
+      >
+        ← Previous routines
+      </a>
+      <span class="muted" th:text="'Page ' + ${routinesPage + 1}">Page 1</span>
+      <a
+        class="button secondary small"
+        th:if="${hasNextRoutinePage}"
+        th:href="@{/admin/users/{id}/inspect(id=${account.id},routinesPage=${routinesPage + 1})}"
+      >
+        More routines →
+      </a>
+    </nav>
+  </section>
+  <section class="panel">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">TRAINING HISTORY</span>
+        <h2>Sessions</h2>
+      </div>
+    </div>
+    <div class="empty" th:if="${#lists.isEmpty(workouts)}">This user has no sessions.</div>
+    <a
+      class="admin-inspect-link-row"
+      th:each="w:${workouts}"
+      th:href="@{/admin/users/{id}/inspect/workouts/{workoutId}(id=${account.id},workoutId=${w.id})}"
+    >
+      <span>
+        <strong th:text="${w.title}">Workout</strong>
+        <small
+          th:text="${w.status} + ' · ' + ${#dates.format(w.started_at,'d MMM yyyy · HH:mm')} + ' · ' + ${w.exercise_count} + ' exercises · ' + ${w.set_count} + ' sets · ' + ${w.elapsed_seconds} + ' sec'"
+        >
+          Session summary
+        </small>
+      </span>
+      <span class="admin-inspect-open">View session →</span>
+    </a>
+    <nav
+      class="admin-inspect-pagination"
+      aria-label="Session pages"
+      th:if="${hasPreviousSessionPage or hasNextSessionPage}"
+    >
+      <a
+        class="button secondary small"
+        th:if="${hasPreviousSessionPage}"
+        th:href="@{/admin/users/{id}/inspect(id=${account.id},sessionsPage=${sessionsPage - 1})}"
+      >
+        ← Newer sessions
+      </a>
+      <span class="muted" th:text="'Page ' + ${sessionsPage + 1}">Page 1</span>
+      <a
+        class="button secondary small"
+        th:if="${hasNextSessionPage}"
+        th:href="@{/admin/users/{id}/inspect(id=${account.id},sessionsPage=${sessionsPage + 1})}"
+      >
+        Older sessions →
+      </a>
+    </nav>
+  </section>
+</main>

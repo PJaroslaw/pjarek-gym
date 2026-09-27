@@ -1,5 +1,6 @@
 package com.pjarek.gym
 
+import java.util.UUID
 import org.hamcrest.Matchers.containsString
 import org.hamcrest.Matchers.not
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -33,7 +34,7 @@ class AccountSettingsIntegrationTest : IntegrationTestSupport() {
         mockMvc.perform(get("/admin/users").with(user("integration-admin").roles("ADMIN")))
             .andExpect(status().isOk)
             .andExpect(content().string(containsString("Temporary password · change required")))
-        val temporaryUserId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='temporary-password-test'", Long::class.java)!!
+        val temporaryUserId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='temporary-password-test'", UUID::class.java)!!
         mockMvc.perform(get("/admin/users/$temporaryUserId").with(user("integration-admin").roles("ADMIN")))
             .andExpect(status().isOk)
             .andExpect(content().string(containsString("Password change required")))
