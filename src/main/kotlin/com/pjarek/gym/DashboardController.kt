@@ -15,6 +15,13 @@ class DashboardController(private val jdbc: JdbcTemplate, private val access: Us
         val id = access.userId(user)
         model.addAttribute("username", user.username)
         model.addAttribute("routines", jdbc.queryForList("SELECT id,name FROM routine WHERE owner_id=? ORDER BY name", id))
+        model.addAttribute("routineDays", jdbc.queryForList(
+            """SELECT d.id,d.routine_id,d.name,d.position,count(ri.id) exercise_count
+                FROM routine_day d JOIN routine r ON r.id=d.routine_id
+                LEFT JOIN routine_item ri ON ri.day_id=d.id
+                WHERE r.owner_id=? GROUP BY d.id,r.name ORDER BY r.name,d.position""",
+            id
+        ))
         model.addAttribute("active", jdbc.queryForList("SELECT id,title,started_at,status FROM workout WHERE owner_id=? AND status IN ('IN_PROGRESS','PAUSED') ORDER BY started_at DESC", id))
         val recent = jdbc.queryForList("SELECT id,title,started_at,completed_at,elapsed_seconds FROM workout WHERE owner_id=? AND status='COMPLETED' ORDER BY completed_at DESC LIMIT 8", id)
         model.addAttribute("recent", recent.map { it + ("durationLabel" to formatDuration(it["elapsed_seconds"] as Number)) })

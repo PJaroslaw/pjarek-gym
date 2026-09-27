@@ -26,6 +26,7 @@ class RoutineIntegrationTest : IntegrationTestSupport() {
             .andExpect(status().isOk)
             .andReturn().response.contentAsString
 
+        assertPostFormsHaveOneCsrfToken(page)
         assertTrue(page.indexOf("routine-item-delete") > page.indexOf("routine-item-main"))
         assertTrue(page.indexOf("day-danger-zone") > page.indexOf("add-item-form"))
         assertTrue(page.indexOf("routine-danger-zone") > page.indexOf("add-day"))

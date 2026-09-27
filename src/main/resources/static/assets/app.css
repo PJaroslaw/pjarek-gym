@@ -352,3 +352,22 @@ select option{background:var(--option-bg);color:var(--option-color)}
 .admin-inspect-set-heading+ .admin-inspect-set{border-top:1px solid var(--line)}
 .muted{color:var(--muted);font-size:12px;margin:12px 0 0}
 @media(max-width:620px){.user-row-actions .button{flex:1}.admin-inspect-link-row{align-items:flex-start}.admin-inspect-open{font-size:11px}.admin-inspect-pagination{flex-wrap:wrap}.admin-inspect-set-heading,.admin-inspect-set{grid-template-columns:1fr 1fr 1fr;gap:6px;font-size:11px}}
+
+.dashboard-routine{border-top:1px solid var(--line)}
+.dashboard-routine>summary{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:13px 2px;cursor:pointer;list-style:none}
+.dashboard-routine>summary::-webkit-details-marker{display:none}
+.dashboard-routine>summary>span:first-child{display:grid;gap:3px;min-width:0}
+.dashboard-routine>summary strong{font-size:13px;font-weight:600}
+.dashboard-routine>summary small{font-size:11px;color:var(--muted)}
+.dashboard-routine>summary:hover strong,.dashboard-routine[open]>summary strong{color:var(--mint)}
+.dashboard-routine-toggle{color:var(--mint);font-size:17px;transition:transform .15s ease}
+.dashboard-routine[open] .dashboard-routine-toggle{transform:rotate(180deg)}
+.dashboard-routine-days{padding:0 0 10px 12px}
+.dashboard-routine-day{display:flex;align-items:center;justify-content:space-between;gap:12px;padding:10px 0;border-top:1px solid var(--line)}
+.dashboard-routine-day>span{display:grid;gap:3px;min-width:0}
+.dashboard-routine-day strong{font-size:12px}
+.dashboard-routine-day small{font-size:10px;color:var(--muted)}
+.dashboard-routine-day form{margin:0;flex:0 0 auto}
+.dashboard-routine-manage{display:inline-block;margin-top:8px;color:var(--mint);font-size:11px}
+.dashboard-routine>summary:focus-visible,.dashboard-routine-manage:focus-visible{outline:2px solid var(--mint);outline-offset:3px;border-radius:3px}
+@media(max-width:620px){.dashboard-routine-days{padding-left:8px}.dashboard-routine-day{align-items:flex-start;flex-wrap:wrap}.dashboard-routine-day form{width:100%}.dashboard-routine-day .button{width:100%}}

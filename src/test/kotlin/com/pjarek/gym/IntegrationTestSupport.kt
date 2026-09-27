@@ -2,6 +2,8 @@ package com.pjarek.gym
 
 import org.junit.jupiter.api.AfterEach
 import org.junit.jupiter.api.BeforeEach
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertTrue
 import org.springframework.beans.factory.annotation.Autowired
 import org.springframework.boot.test.context.SpringBootTest
 import org.springframework.boot.webmvc.test.autoconfigure.AutoConfigureMockMvc
@@ -18,6 +20,18 @@ abstract class IntegrationTestSupport {
     @Autowired protected lateinit var mockMvc: MockMvc
     @Autowired protected lateinit var jdbc: JdbcTemplate
     @Autowired protected lateinit var passwordEncoder: PasswordEncoder
+
+    protected fun assertPostFormsHaveOneCsrfToken(html: String) {
+        val postForms = Regex("<form\\b([^>]*)>(.*?)</form>", RegexOption.DOT_MATCHES_ALL)
+            .findAll(html)
+            .filter { it.groupValues[1].contains("method=\"post\"") }
+            .toList()
+
+        assertTrue(postForms.isNotEmpty())
+        postForms.forEach { form ->
+            assertEquals(1, Regex("name=\"_csrf\"").findAll(form.groupValues[2]).count())
+        }
+    }
 
     @BeforeEach
     fun createTestUser() {

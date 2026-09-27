@@ -61,6 +61,7 @@ class AdminUserIntegrationTest : IntegrationTestSupport() {
         val editPage = mockMvc.perform(get("/admin/users/$userId").with(admin))
             .andExpect(status().isOk)
             .andReturn().response.contentAsString
+        assertPostFormsHaveOneCsrfToken(editPage)
         assertTrue(editPage.contains("Set password"))
         assertTrue(editPage.contains("Disable user"))
         assertTrue(editPage.contains("Delete user and all data"))

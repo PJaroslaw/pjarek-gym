@@ -8,7 +8,6 @@
     </div>
   </div>
   <form class="panel inline-form rename-form" method="post" th:action="@{/routines/{id}/rename(id=${routine.id})}">
-    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
     <input name="name" th:value="${routine.name}" maxlength="160" required />
     <button class="button secondary small">Rename</button>
   </form>
@@ -24,7 +23,6 @@
             method="post"
             th:action="@{/routines/{id}/days/{dayId}/rename(id=${routine.id},dayId=${day.id})}"
           >
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <label class="sr-only" th:for="'day-name-' + ${day.id}">Day name</label>
             <input th:id="'day-name-' + ${day.id}" name="name" th:value="${day.name}" maxlength="120" required />
             <button class="button secondary small">Rename</button>
@@ -32,7 +30,6 @@
         </div>
         <div class="action-row">
           <form method="post" th:action="@{/routines/{r}/days/{d}/start(r=${routine.id},d=${day.id})}">
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <button class="button primary small">Start this day →</button>
           </form>
         </div>
@@ -54,7 +51,6 @@
               method="post"
               th:action="@{/routines/{id}/items/{itemId}/edit(id=${routine.id},itemId=${item.id})}"
             >
-              <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
               <label>
                 Exercise
                 <div class="exercise-picker" data-exercise-picker>
@@ -100,13 +96,11 @@
             th:action="@{/routines/{id}/items/{itemId}/delete(id=${routine.id},itemId=${item.id})}"
             onsubmit="return confirm('Remove this exercise from the routine?');"
           >
-            <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
             <button class="button danger-strong small">Remove exercise</button>
           </form>
         </div>
       </div>
       <form class="add-item-form" method="post" th:action="@{/routines/{id}/items(id=${routine.id})}">
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <input type="hidden" name="dayId" th:value="${day.id}" />
         <label>
           Exercise
@@ -151,13 +145,11 @@
         th:action="@{/routines/{id}/days/{dayId}/delete(id=${routine.id},dayId=${day.id})}"
         onsubmit="return confirm('Delete this day and its planned exercises? Completed workouts will remain.');"
       >
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
         <button class="button danger-strong small">Delete day</button>
       </form>
     </article>
   </section>
   <form class="panel add-day" method="post" th:action="@{/routines/{id}/days(id=${routine.id})}">
-    <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
     <input
       name="name"
       placeholder="e.g. Upper body, Pull"
@@ -174,7 +166,6 @@
       th:action="@{/routines/{id}/delete(id=${routine.id})}"
       onsubmit="return confirm('Delete this routine?');"
     >
-      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
       <button class="button danger-strong">Delete routine</button>
     </form>
   </section>

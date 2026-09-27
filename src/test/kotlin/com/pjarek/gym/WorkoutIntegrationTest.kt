@@ -69,12 +69,49 @@ class WorkoutIntegrationTest : IntegrationTestSupport() {
         val page = mockMvc.perform(get("/").with(user("exercise-search-test")))
             .andExpect(status().isOk)
             .andReturn().response.contentAsString
+        assertPostFormsHaveOneCsrfToken(page)
         val recent = page.substringAfter("<section class=\"panel recent\">").substringBefore("</section>")
 
         assertTrue(recent.contains("/workouts/$completedId"))
         assertFalse(recent.contains("Delete"))
         assertTrue(page.contains("Overview active"))
         assertTrue(page.contains("Delete"))
+    }
+
+    @Test
+    fun `dashboard routines expand to planned days and start the selected day`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val routineId = jdbc.queryForObject(
+            "INSERT INTO routine(owner_id,name) VALUES (?, 'Dashboard plan') RETURNING id",
+            UUID::class.java,
+            ownerId
+        )!!
+        val dayId = jdbc.queryForObject(
+            "INSERT INTO routine_day(routine_id,name,position) VALUES (?, 'Upper body', 1) RETURNING id",
+            UUID::class.java,
+            routineId
+        )!!
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
+        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position) VALUES (?,?,1)", dayId, exerciseId)
+
+        val page = mockMvc.perform(get("/").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andReturn().response.contentAsString
+
+        assertTrue(page.contains("Dashboard plan"))
+        assertTrue(page.contains("Upper body"))
+        assertTrue(page.contains("Planned exercises: 1"))
+        assertTrue(page.contains("/routines/$routineId/days/$dayId/start"))
+        assertPostFormsHaveOneCsrfToken(page)
+
+        val redirect = mockMvc.perform(post("/routines/$routineId/days/$dayId/start")
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andReturn().response.redirectedUrl!!
+        val workoutId = UUID.fromString(redirect.substringAfterLast('/'))
+
+        assertEquals("Upper body", jdbc.queryForObject("SELECT title FROM workout WHERE id=?", String::class.java, workoutId))
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM workout_exercise WHERE workout_id=?", Int::class.java, workoutId))
     }
 
     @Test
@@ -111,6 +148,7 @@ class WorkoutIntegrationTest : IntegrationTestSupport() {
             .andExpect(content().string(containsString(">Show</a>")))
             .andExpect(content().string(containsString("returnTo=history")))
             .andReturn().response.contentAsString
+        assertPostFormsHaveOneCsrfToken(historyPage)
         assertTrue(historyPage.contains("href=\"/workouts/$workoutId\""))
         assertFalse(historyPage.contains("kg volume"))
 
@@ -161,6 +199,7 @@ class WorkoutIntegrationTest : IntegrationTestSupport() {
             .andExpect(content().string(containsString("value=\"8\"")))
             .andExpect(content().string(containsString("Plan: 1 sets · 6–8 reps")))
             .andReturn().response.contentAsString
+        assertPostFormsHaveOneCsrfToken(firstStep)
         assertTrue(firstStep.contains("FORM NOTES"))
         val firstItemId = jdbc.queryForObject("SELECT id FROM workout_exercise WHERE workout_id=? AND position=1", UUID::class.java, workoutId)!!
         assertEquals(6, jdbc.queryForObject("SELECT min_reps FROM workout_exercise WHERE id=?", Int::class.java, firstItemId))
