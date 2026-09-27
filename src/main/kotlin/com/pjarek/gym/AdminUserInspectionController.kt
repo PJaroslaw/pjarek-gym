@@ -32,7 +32,7 @@ class AdminUserInspectionController(private val jdbc: JdbcTemplate) {
             """SELECT r.id,r.name,count(DISTINCT d.id) day_count,count(ri.id) exercise_count
                 FROM routine r LEFT JOIN routine_day d ON d.routine_id=r.id
                 LEFT JOIN routine_item ri ON ri.day_id=d.id WHERE r.owner_id=?
-                GROUP BY r.id ORDER BY r.name LIMIT ? OFFSET ?""",
+                GROUP BY r.id ORDER BY r.name,r.id LIMIT ? OFFSET ?""",
             id, PAGE_SIZE, currentRoutinePage * PAGE_SIZE
         ))
         model.addAttribute("routinesPage", currentRoutinePage)

@@ -145,27 +145,43 @@ class AdminUserIntegrationTest : IntegrationTestSupport() {
         val userId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
         repeat(21) { index ->
             jdbc.update("INSERT INTO workout(owner_id,title) VALUES (?,?)", userId, "Inspection session $index")
-            jdbc.update("INSERT INTO routine(owner_id,name) VALUES (?,?)", userId, "Inspection routine $index")
         }
+        val routineIds = (20 downTo 0).map { index ->
+            val routineId = UUID.fromString("00000000-0000-4000-8000-${index.toString().padStart(12, '0')}")
+            jdbc.update("INSERT INTO routine(id,owner_id,name) VALUES (?,?,?)", routineId, userId, "Repeated routine")
+            routineId
+        }.sorted()
         val admin = user("integration-admin").roles("ADMIN")
 
-        mockMvc.perform(get("/admin/users/$userId/inspect").with(admin))
+        val firstPage = mockMvc.perform(get("/admin/users/$userId/inspect").with(admin))
             .andExpect(status().isOk)
             .andExpect(content().string(containsString("Older sessions →")))
             .andExpect(content().string(containsString("sessionsPage=1")))
             .andExpect(content().string(containsString("More routines →")))
             .andExpect(content().string(containsString("routinesPage=1")))
+            .andReturn().response.contentAsString
 
         mockMvc.perform(get("/admin/users/$userId/inspect").param("sessionsPage", "1").with(admin))
             .andExpect(status().isOk)
             .andExpect(content().string(containsString("Newer sessions")))
             .andExpect(content().string(not(containsString("Older sessions →"))))
 
-        mockMvc.perform(get("/admin/users/$userId/inspect").param("routinesPage", "1").with(admin))
+        val firstPageRoutineIds = routineIdsInInspectionPage(firstPage, userId)
+        val secondPage = mockMvc.perform(get("/admin/users/$userId/inspect").param("routinesPage", "1").with(admin))
             .andExpect(status().isOk)
             .andExpect(content().string(containsString("Previous routines")))
             .andExpect(content().string(not(containsString("More routines →"))))
+            .andReturn().response.contentAsString
+
+        assertEquals(routineIds.take(20), firstPageRoutineIds)
+        assertEquals(routineIds.drop(20), routineIdsInInspectionPage(secondPage, userId))
     }
+
+    private fun routineIdsInInspectionPage(page: String, userId: UUID): List<UUID> =
+        Regex("/admin/users/$userId/inspect/routines/([0-9a-f-]{36})")
+            .findAll(page)
+            .map { UUID.fromString(it.groupValues[1]) }
+            .toList()
 
     @Test
     fun `admin can delete another admin and all their data but not their own account`() {
