@@ -1,0 +1,32 @@
+<main xmlns:th="http://www.thymeleaf.org">
+  <a class="back-link" th:href="@{/admin/users/{id}/inspect(id=${account.id})}">
+    ← Back to
+    <span th:text="${account.username}">user</span>
+  </a>
+  <div class="page-title">
+    <div>
+      <span class="eyebrow">READ-ONLY ROUTINE INSPECTION</span>
+      <h1 th:text="${routine.name}">Routine</h1>
+      <p>
+        Routine created by
+        <span th:text="${account.username}">user</span>
+        . This page is read-only.
+      </p>
+    </div>
+  </div>
+  <section class="panel">
+    <div class="empty" th:if="${#lists.isEmpty(days)}">This routine has no planned days.</div>
+    <article class="admin-inspect-day admin-inspect-detail-day" th:each="d:${days}">
+      <h2 th:text="'Day ' + ${d.position} + ' · ' + ${d.name}">Day</h2>
+      <div class="empty compact" th:if="${#lists.isEmpty(items.?[day_id == #vars.d.id])}">No exercises planned.</div>
+      <div class="admin-inspect-exercise" th:each="i:${items}" th:if="${i.day_id == d.id}">
+        <strong th:text="${i.exercise_name}">Exercise</strong>
+        <small
+          th:text="${i.planned_sets} + ' sets · ' + ${i.min_reps} + '–' + ${i.max_reps} + ' reps · ' + ${i.rest_seconds} + 's rest'"
+        >
+          Plan
+        </small>
+      </div>
+    </article>
+  </section>
+</main>

@@ -57,7 +57,6 @@
           th:action="@{/workouts/{id}/delete(id=${w.id},returnTo='overview')}"
           onsubmit="return confirm('Delete this in-progress workout? This cannot be undone.');"
         >
-          <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
           <button class="button danger-strong small">Delete</button>
         </form>
       </div>
@@ -76,13 +75,31 @@
         <p>Build your first weekly plan.</p>
         <a href="/routines">Create a routine →</a>
       </div>
-      <a class="list-row" th:each="r:${routines}" th:href="@{/routines/{id}(id=${r.id})}">
-        <span>
-          <strong th:text="${r.name}">Routine</strong>
-          <small>View days and exercises</small>
-        </span>
-        <span class="arrow">→</span>
-      </a>
+      <details class="dashboard-routine" th:each="r:${routines}">
+        <summary>
+          <span>
+            <strong th:text="${r.name}">Routine</strong>
+            <small>Choose a day to start</small>
+          </span>
+          <span class="dashboard-routine-toggle" aria-hidden="true">⌄</span>
+        </summary>
+        <div class="dashboard-routine-days">
+          <div class="empty compact" th:if="${#lists.isEmpty(routineDays.?[routine_id == #vars.r.id])}">
+            This routine has no days yet.
+            <a th:href="@{/routines/{id}(id=${r.id})}">Add a day →</a>
+          </div>
+          <div class="dashboard-routine-day" th:each="d:${routineDays}" th:if="${d.routine_id == r.id}">
+            <span>
+              <strong th:text="${d.name}">Day</strong>
+              <small th:text="'Planned exercises: ' + ${d.exercise_count}">Planned exercises: 0</small>
+            </span>
+            <form method="post" th:action="@{/routines/{r}/days/{d}/start(r=${r.id},d=${d.id})}">
+              <button class="button primary small">Start workout →</button>
+            </form>
+          </div>
+          <a class="dashboard-routine-manage" th:href="@{/routines/{id}(id=${r.id})}">Open routine →</a>
+        </div>
+      </details>
     </section>
   </div>
   <section class="panel recent">
@@ -102,14 +119,6 @@
         </span>
         <span class="badge">DONE</span>
       </a>
-      <form
-        method="post"
-        th:action="@{/workouts/{id}/delete(id=${w.id},returnTo='overview')}"
-        onsubmit="return confirm('Delete this completed workout and its logged sets? This cannot be undone.');"
-      >
-        <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
-        <button class="button danger-strong small">Delete</button>
-      </form>
     </div>
     <div class="volume-chart" th:if="${!#lists.isEmpty(volumeTrend)}">
       <span class="eyebrow">SESSION VOLUME TREND</span>

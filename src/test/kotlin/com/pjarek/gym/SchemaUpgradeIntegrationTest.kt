@@ -18,7 +18,7 @@ class SchemaUpgradeIntegrationTest {
         val dataSource = DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password)
         migrate(dataSource, "2")
         val jdbc = JdbcTemplate(dataSource)
-        val ownerId = jdbc.queryForObject(
+        val legacyOwnerId = jdbc.queryForObject(
             "INSERT INTO app_user(username,password_hash,role) VALUES ('migration-test','unused','USER') RETURNING id",
             Long::class.java
         )!!
@@ -29,45 +29,69 @@ class SchemaUpgradeIntegrationTest {
         val routineId = jdbc.queryForObject(
             "INSERT INTO routine(owner_id,name) VALUES (?, 'Migration routine') RETURNING id",
             UUID::class.java,
-            ownerId
+            legacyOwnerId
         )!!
-        val dayId = jdbc.queryForObject(
+        val legacyDayId = jdbc.queryForObject(
             "INSERT INTO routine_day(routine_id,name,position) VALUES (?, 'Day', 1) RETURNING id",
             Long::class.java,
             routineId
         )!!
-        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,rep_target) VALUES (?,?,1,'6 - 8')", dayId, exerciseId)
-        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,rep_target) VALUES (?,?,2,'14')", dayId, exerciseId)
-        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,rep_target) VALUES (?,?,3,'invalid')", dayId, exerciseId)
+        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,rep_target) VALUES (?,?,1,'6 - 8')", legacyDayId, exerciseId)
+        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,rep_target) VALUES (?,?,2,'14')", legacyDayId, exerciseId)
+        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,rep_target) VALUES (?,?,3,'invalid')", legacyDayId, exerciseId)
 
-        val completedId = insertWorkout(jdbc, ownerId, "COMPLETED", Instant.now().minusSeconds(1000))
-        val workoutExerciseId = jdbc.queryForObject(
+        val completedId = insertWorkout(jdbc, legacyOwnerId, "COMPLETED", Instant.now().minusSeconds(1000))
+        val legacyWorkoutExerciseId = jdbc.queryForObject(
             "INSERT INTO workout_exercise(workout_id,exercise_id,position,rep_target) VALUES (?,?,1,'10-15') RETURNING id",
             Long::class.java,
             completedId,
             exerciseId
         )!!
-        jdbc.update("INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight,weight_unit) VALUES (?,1,8,100,'LB')", workoutExerciseId)
+        jdbc.update("INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight,weight_unit) VALUES (?,1,8,100,'LB')", legacyWorkoutExerciseId)
         addEvent(jdbc, completedId, "PAUSED", 200)
         addEvent(jdbc, completedId, "RESUMED", 300)
         addEvent(jdbc, completedId, "PAUSED", 500)
         addEvent(jdbc, completedId, "RESUMED", 600)
         jdbc.update("UPDATE workout SET completed_at=started_at+interval '900 seconds' WHERE id=?", completedId)
 
-        val pausedId = insertWorkout(jdbc, ownerId, "PAUSED", Instant.now().minusSeconds(1000))
+        val pausedId = insertWorkout(jdbc, legacyOwnerId, "PAUSED", Instant.now().minusSeconds(1000))
         addEvent(jdbc, pausedId, "PAUSED", 300)
         addEvent(jdbc, pausedId, "RESUMED", 400)
         addEvent(jdbc, pausedId, "PAUSED", 900)
 
-        val activeId = insertWorkout(jdbc, ownerId, "IN_PROGRESS", Instant.now().minusSeconds(600))
+        val activeId = insertWorkout(jdbc, legacyOwnerId, "IN_PROGRESS", Instant.now().minusSeconds(600))
         addEvent(jdbc, activeId, "PAUSED", 100)
         addEvent(jdbc, activeId, "RESUMED", 500)
 
         migrate(dataSource, null)
 
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='migration-test'", UUID::class.java)!!
+        val dayId = jdbc.queryForObject("SELECT id FROM routine_day WHERE routine_id=?", UUID::class.java, routineId)!!
+        val workoutExerciseId = jdbc.queryForObject("SELECT id FROM workout_exercise WHERE workout_id=?", UUID::class.java, completedId)!!
+        assertTrue(ownerId.toString() != legacyOwnerId.toString())
+        assertTrue(dayId.toString() != legacyDayId.toString())
+        assertTrue(workoutExerciseId.toString() != legacyWorkoutExerciseId.toString())
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM routine WHERE id=? AND owner_id=?", Int::class.java, routineId, ownerId))
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM routine_item WHERE day_id=?", Int::class.java, dayId))
+        assertEquals(3, jdbc.queryForObject("SELECT count(*) FROM workout WHERE owner_id=?", Int::class.java, ownerId))
+        assertEquals(9, jdbc.queryForObject("SELECT count(*) FROM workout_event", Int::class.java))
+        assertEquals(UUID::class.java, jdbc.queryForObject("SELECT id FROM routine_item WHERE day_id=? LIMIT 1", UUID::class.java, dayId)!!::class.java)
+        assertEquals(UUID::class.java, jdbc.queryForObject("SELECT id FROM workout_set WHERE workout_exercise_id=?", UUID::class.java, workoutExerciseId)!!::class.java)
+        assertEquals(
+            12,
+            jdbc.queryForObject(
+                """SELECT count(*) FROM information_schema.columns WHERE table_schema=current_schema()
+                    AND data_type='uuid' AND (table_name,column_name) IN (
+                      ('app_user','id'),('routine','owner_id'),('routine_day','id'),('routine_item','id'),('routine_item','day_id'),
+                      ('workout','owner_id'),('workout','routine_day_id'),('workout_exercise','id'),('workout_set','id'),
+                      ('workout_set','workout_exercise_id'),('workout_event','id'),('routine','id'))""",
+                Int::class.java
+            )
+        )
+
         assertEquals(
             listOf("6:8", "14:14", "8:12"),
-            jdbc.queryForList("SELECT min_reps || ':' || max_reps FROM routine_item ORDER BY position", String::class.java)
+            jdbc.queryForList("SELECT min_reps || ':' || max_reps FROM routine_item WHERE day_id=? ORDER BY position", String::class.java, dayId)
         )
         assertEquals("10:15", jdbc.queryForObject(
             "SELECT min_reps || ':' || max_reps FROM workout_exercise WHERE workout_id=?",

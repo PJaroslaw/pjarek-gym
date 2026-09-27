@@ -27,7 +27,7 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
         if (exerciseId == null) return "redirect:/workouts/$workout"
         val itemId = jdbc.query(
             "INSERT INTO workout_exercise(workout_id,exercise_id,position,instructions_snapshot) SELECT ?,id,1,instructions FROM exercise WHERE id=? AND active=TRUE RETURNING id",
-            { rs, _ -> rs.getLong(1) },
+            { rs, _ -> rs.getObject(1, UUID::class.java) },
             workout,
             exerciseId
         ).first()
@@ -37,13 +37,13 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
     @GetMapping("/workouts/{id}")
     fun workout(
         @PathVariable id: UUID,
-        @RequestParam(required = false) exercise: Long?,
+        @RequestParam(required = false) exercise: UUID?,
         @RequestParam(required = false) restSeconds: Int?,
         @RequestParam(required = false) restStartedAt: Long?,
         @AuthenticationPrincipal user: UserDetails,
         model: Model
     ): String {
-        val owner = access.ownerScope(user)
+        val owner = access.userId(user)
         access.ownedWorkout(id, owner)
         model.addAttribute("restRemainingMillis", restRemainingMillis(restSeconds, restStartedAt))
         val w = jdbc.queryForMap(
@@ -54,7 +54,28 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
         model.addAttribute("workout", w)
         model.addAttribute("workoutElapsedSeconds", w["displayed_elapsed_seconds"])
         val items = jdbc.queryForList("SELECT we.*,e.name,e.primary_muscles,e.equipment,e.source_id,(SELECT count(*) FROM workout_set s WHERE s.workout_exercise_id=we.id) completed_sets FROM workout_exercise we JOIN exercise e ON e.id=we.exercise_id WHERE we.workout_id=? ORDER BY we.position", id)
-        val requestedCurrent = exercise?.let { requested -> items.firstOrNull { (it["id"] as Number).toLong() == requested } }
+        val weightUnit = jdbc.queryForObject("SELECT weight_unit FROM app_user WHERE id=?", String::class.java, owner)!!
+        if (w["status"] == "COMPLETED") {
+            model.addAttribute("sessionExercises", items)
+            model.addAttribute(
+                "sessionVolume",
+                jdbc.queryForObject(
+                    "SELECT coalesce(sum(s.reps*s.weight),0) FROM workout_set s JOIN workout_exercise we ON we.id=s.workout_exercise_id WHERE we.workout_id=?",
+                    BigDecimal::class.java,
+                    id
+                )!!
+            )
+            model.addAttribute(
+                "sessionSets",
+                jdbc.queryForList(
+                    "SELECT s.*,we.id AS workout_exercise_id FROM workout_set s JOIN workout_exercise we ON we.id=s.workout_exercise_id WHERE we.workout_id=? ORDER BY we.position,s.set_number",
+                    id
+                ).map { set ->
+                    set + ("displayWeight" to WeightUnits.fromKilograms(set["weight"] as BigDecimal, weightUnit))
+                }
+            )
+        }
+        val requestedCurrent = exercise?.let { requested -> items.firstOrNull { it["id"] == requested } }
         require(exercise == null || requestedCurrent != null) { "Exercise not found in this workout." }
         val current = requestedCurrent
             ?: items.firstOrNull {
@@ -82,7 +103,6 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
                 ORDER BY s.set_number""",
             access.userId(user), current["exercise_id"], access.userId(user), current["exercise_id"]
         )
-        val weightUnit = jdbc.queryForObject("SELECT weight_unit FROM app_user WHERE id=?", String::class.java, access.userId(user))!!
         val sets = storedSets.map { set ->
             set + ("displayWeight" to WeightUnits.fromKilograms(set["weight"] as BigDecimal, weightUnit))
         }
@@ -105,11 +125,11 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
 
     @PostMapping("/workouts/{id}/exercises")
     fun addWorkoutExercise(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam exerciseId: Long): String {
-        access.ownedWorkout(id, access.ownerScope(user)); access.requireActive(id)
+        access.ownedWorkout(id, access.userId(user)); access.requireActive(id)
         val pos = jdbc.queryForObject("SELECT coalesce(max(position),0)+1 FROM workout_exercise WHERE workout_id=?", Int::class.java, id)!!
         val itemId = jdbc.query(
             "INSERT INTO workout_exercise(workout_id,exercise_id,position,instructions_snapshot) SELECT ?,id,?,instructions FROM exercise WHERE id=? AND active=TRUE RETURNING id",
-            { rs, _ -> rs.getLong(1) },
+            { rs, _ -> rs.getObject(1, UUID::class.java) },
             id,
             pos,
             exerciseId
@@ -117,24 +137,10 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
         return "redirect:/workouts/$id?exercise=$itemId"
     }
 
-    @PostMapping("/workouts/{id}/exercises/{itemId}/move")
-    fun moveWorkoutExercise(@PathVariable id: UUID, @PathVariable itemId: Long, @AuthenticationPrincipal user: UserDetails, @RequestParam direction: String): String {
-        access.ownedWorkout(id, access.ownerScope(user)); access.requireActive(id); require(direction in listOf("up", "down"))
-        val current = jdbc.queryForObject("SELECT position FROM workout_exercise WHERE id=? AND workout_id=?", Int::class.java, itemId, id) ?: throw IllegalArgumentException("Exercise not found")
-        val target = if (direction == "up") current - 1 else current + 1
-        val neighbor = jdbc.query("SELECT id FROM workout_exercise WHERE workout_id=? AND position=?", { rs, _ -> rs.getLong(1) }, id, target).firstOrNull()
-        if (neighbor != null) {
-            jdbc.update("UPDATE workout_exercise SET position=-1 WHERE id=?", itemId)
-            jdbc.update("UPDATE workout_exercise SET position=? WHERE id=?", current, neighbor)
-            jdbc.update("UPDATE workout_exercise SET position=? WHERE id=?", target, itemId)
-        }
-        return "redirect:/workouts/$id"
-    }
-
     @PostMapping("/workouts/{id}/sets")
-    fun logSet(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam itemId: Long,
+    fun logSet(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam itemId: UUID,
                @RequestParam reps: Int, @RequestParam weight: BigDecimal): String {
-        access.ownedWorkout(id, access.ownerScope(user)); access.requireActive(id)
+        access.ownedWorkout(id, access.userId(user)); access.requireActive(id)
         val unit = jdbc.queryForObject("SELECT weight_unit FROM app_user WHERE id=?", String::class.java, access.userId(user))!!
         require(reps in 0..1000 && WeightUnits.isValidInput(weight, unit)) {
             "Enter 0–1,000 reps and a valid weight from 0–2,000 in $unit."
@@ -144,7 +150,7 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
         val restSeconds = jdbc.queryForObject("SELECT rest_seconds FROM workout_exercise WHERE id=? AND workout_id=?", Int::class.java, itemId, id)!!
         jdbc.queryForObject(
             "INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight) VALUES (?,?,?,?) RETURNING id",
-            Long::class.java, itemId, setNumber, reps, WeightUnits.toKilograms(weight, unit)
+            UUID::class.java, itemId, setNumber, reps, WeightUnits.toKilograms(weight, unit)
         )
         val restStartedAt = Instant.now().toEpochMilli()
         return "redirect:/workouts/$id?exercise=$itemId&restSeconds=$restSeconds&restStartedAt=$restStartedAt"
@@ -153,19 +159,19 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
     @PostMapping("/workouts/{id}/sets/{setId}/edit")
     fun editWorkoutSet(
         @PathVariable id: UUID,
-        @PathVariable setId: Long,
+        @PathVariable setId: UUID,
         @AuthenticationPrincipal user: UserDetails,
         @RequestParam reps: Int,
         @RequestParam weight: BigDecimal
     ): String {
-        access.ownedWorkout(id, access.ownerScope(user)); access.requireActive(id)
+        access.ownedWorkout(id, access.userId(user)); access.requireActive(id)
         val unit = jdbc.queryForObject("SELECT weight_unit FROM app_user WHERE id=?", String::class.java, access.userId(user))!!
         require(reps in 0..1000 && WeightUnits.isValidInput(weight, unit)) {
             "Enter 0–1,000 reps and a valid weight from 0–2,000 in $unit."
         }
         val itemId = jdbc.query(
             "SELECT we.id FROM workout_set s JOIN workout_exercise we ON we.id=s.workout_exercise_id WHERE s.id=? AND we.workout_id=?",
-            { rs, _ -> rs.getLong(1) }, setId, id
+            { rs, _ -> rs.getObject(1, UUID::class.java) }, setId, id
         ).firstOrNull() ?: throw IllegalArgumentException("Set not found in this workout.")
         jdbc.update("UPDATE workout_set SET reps=?,weight=? WHERE id=?", reps, WeightUnits.toKilograms(weight, unit), setId)
         return "redirect:/workouts/$id?exercise=$itemId"
@@ -174,13 +180,13 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
     @PostMapping("/workouts/{id}/sets/{setId}/delete")
     fun deleteWorkoutSet(
         @PathVariable id: UUID,
-        @PathVariable setId: Long,
+        @PathVariable setId: UUID,
         @AuthenticationPrincipal user: UserDetails
     ): String {
-        access.ownedWorkout(id, access.ownerScope(user)); access.requireActive(id)
+        access.ownedWorkout(id, access.userId(user)); access.requireActive(id)
         val itemId = jdbc.query(
             "SELECT we.id FROM workout_set s JOIN workout_exercise we ON we.id=s.workout_exercise_id WHERE s.id=? AND we.workout_id=?",
-            { rs, _ -> rs.getLong(1) }, setId, id
+            { rs, _ -> rs.getObject(1, UUID::class.java) }, setId, id
         ).firstOrNull() ?: throw IllegalArgumentException("Set not found in this workout.")
         jdbc.update("DELETE FROM workout_set WHERE id=?", setId)
         jdbc.update(
@@ -192,7 +198,7 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
 
     @PostMapping("/workouts/{id}/finish")
     fun finishWorkout(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails): String {
-        access.ownedWorkout(id, access.ownerScope(user))
+        access.ownedWorkout(id, access.userId(user))
         val updated = jdbc.update(
             """UPDATE workout SET elapsed_seconds=elapsed_seconds+CASE WHEN status='IN_PROGRESS'
                 THEN floor(extract(epoch FROM (now()-active_since)))::INTEGER ELSE 0 END,
@@ -205,8 +211,12 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
     }
 
     @PostMapping("/workouts/{id}/pause")
-    fun pause(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails): String {
-        access.ownedWorkout(id, access.ownerScope(user))
+    fun pause(
+        @PathVariable id: UUID,
+        @AuthenticationPrincipal user: UserDetails,
+        @RequestParam(required = false) exercise: UUID?
+    ): String {
+        access.ownedWorkout(id, access.userId(user))
         val updated = jdbc.update(
             """UPDATE workout SET elapsed_seconds=elapsed_seconds+floor(extract(epoch FROM (now()-active_since)))::INTEGER,
                 active_since=NULL,status='PAUSED' WHERE id=? AND status='IN_PROGRESS'""",
@@ -214,16 +224,20 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
         )
         require(updated == 1) { "This workout is not running." }
         jdbc.update("INSERT INTO workout_event(workout_id,kind) VALUES (?,'PAUSED')", id)
-        return "redirect:/workouts/$id"
+        return workoutRedirect(id, exercise)
     }
 
     @PostMapping("/workouts/{id}/resume")
-    fun resume(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails): String {
-        access.ownedWorkout(id, access.ownerScope(user))
+    fun resume(
+        @PathVariable id: UUID,
+        @AuthenticationPrincipal user: UserDetails,
+        @RequestParam(required = false) exercise: UUID?
+    ): String {
+        access.ownedWorkout(id, access.userId(user))
         val updated = jdbc.update("UPDATE workout SET status='IN_PROGRESS',active_since=now() WHERE id=? AND status='PAUSED'", id)
         require(updated == 1) { "This workout is not paused." }
         jdbc.update("INSERT INTO workout_event(workout_id,kind) VALUES (?,'RESUMED')", id)
-        return "redirect:/workouts/$id"
+        return workoutRedirect(id, exercise)
     }
 
     @PostMapping("/workouts/{id}/delete")
@@ -249,4 +263,7 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
         val elapsedMillis = if (restStartedAt < now) (now - restStartedAt).coerceAtMost(durationMillis) else 0
         return durationMillis - elapsedMillis
     }
+
+    private fun workoutRedirect(id: UUID, exercise: UUID?): String =
+        if (exercise == null) "redirect:/workouts/$id" else "redirect:/workouts/$id?exercise=$exercise"
 }

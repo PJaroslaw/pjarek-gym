@@ -40,7 +40,7 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
 
     @GetMapping("/routines/{id}")
     fun routine(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, model: Model): String {
-        val owner = access.ownerScope(user)
+        val owner = access.userId(user)
         access.ownedRoutine(id, owner)
         model.addAttribute("routine", jdbc.queryForMap("SELECT * FROM routine WHERE id=?", id))
         model.addAttribute("days", jdbc.queryForList("SELECT * FROM routine_day WHERE routine_id=? ORDER BY position", id))
@@ -50,7 +50,7 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
 
     @PostMapping("/routines/{id}/days")
     fun addDay(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam(defaultValue="") name: String): String {
-        access.ownedRoutine(id, access.ownerScope(user))
+        access.ownedRoutine(id, access.userId(user))
         require(name.isNotBlank() && name.trim().length <= 120) { "Enter a day name up to 120 characters." }
         val pos = jdbc.queryForObject("SELECT coalesce(max(position),0)+1 FROM routine_day WHERE routine_id=?", Int::class.java, id)!!
         jdbc.update("INSERT INTO routine_day(routine_id,name,position) VALUES (?,?,?)", id, name.trim(), pos)
@@ -58,17 +58,17 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
     }
 
     @PostMapping("/routines/{id}/days/{dayId}/rename")
-    fun renameDay(@PathVariable id: UUID, @PathVariable dayId: Long, @AuthenticationPrincipal user: UserDetails,
+    fun renameDay(@PathVariable id: UUID, @PathVariable dayId: UUID, @AuthenticationPrincipal user: UserDetails,
                   @RequestParam name: String): String {
-        access.ownedRoutine(id, access.ownerScope(user)); access.ownedDay(dayId, id)
+        access.ownedRoutine(id, access.userId(user)); access.ownedDay(dayId, id)
         require(name.isNotBlank() && name.trim().length <= 120) { "Enter a day name up to 120 characters." }
         jdbc.update("UPDATE routine_day SET name=? WHERE id=? AND routine_id=?", name.trim(), dayId, id)
         return "redirect:/routines/$id"
     }
 
     @PostMapping("/routines/{id}/days/{dayId}/delete")
-    fun deleteDay(@PathVariable id: UUID, @PathVariable dayId: Long, @AuthenticationPrincipal user: UserDetails): String {
-        access.ownedRoutine(id, access.ownerScope(user)); access.ownedDay(dayId, id)
+    fun deleteDay(@PathVariable id: UUID, @PathVariable dayId: UUID, @AuthenticationPrincipal user: UserDetails): String {
+        access.ownedRoutine(id, access.userId(user)); access.ownedDay(dayId, id)
         val position = jdbc.queryForObject("SELECT position FROM routine_day WHERE id=? AND routine_id=?", Int::class.java, dayId, id)!!
         jdbc.update("DELETE FROM routine_day WHERE id=? AND routine_id=?", dayId, id)
         jdbc.update("UPDATE routine_day SET position=position-1 WHERE routine_id=? AND position>?", id, position)
@@ -77,20 +77,20 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
 
     @PostMapping("/routines/{id}/rename")
     fun renameRoutine(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam name: String): String {
-        access.ownedRoutine(id, access.ownerScope(user)); require(name.isNotBlank() && name.length <= 160)
+        access.ownedRoutine(id, access.userId(user)); require(name.isNotBlank() && name.length <= 160)
         jdbc.update("UPDATE routine SET name=? WHERE id=?", name.trim(), id)
         return "redirect:/routines/$id"
     }
 
     @PostMapping("/routines/{id}/delete")
     fun deleteRoutine(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails): String {
-        access.ownedRoutine(id, access.ownerScope(user)); jdbc.update("DELETE FROM routine WHERE id=?", id)
+        access.ownedRoutine(id, access.userId(user)); jdbc.update("DELETE FROM routine WHERE id=?", id)
         return "redirect:/routines"
     }
 
     @PostMapping("/routines/{id}/items/{itemId}/delete")
-    fun deleteRoutineItem(@PathVariable id: UUID, @PathVariable itemId: Long, @AuthenticationPrincipal user: UserDetails): String {
-        access.ownedRoutine(id, access.ownerScope(user))
+    fun deleteRoutineItem(@PathVariable id: UUID, @PathVariable itemId: UUID, @AuthenticationPrincipal user: UserDetails): String {
+        access.ownedRoutine(id, access.userId(user))
         jdbc.update("DELETE FROM routine_item WHERE id=? AND day_id IN (SELECT id FROM routine_day WHERE routine_id=?)", itemId, id)
         return "redirect:/routines/$id"
     }
@@ -98,7 +98,7 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
     @PostMapping("/routines/{id}/items/{itemId}/edit")
     fun editRoutineItem(
         @PathVariable id: UUID,
-        @PathVariable itemId: Long,
+        @PathVariable itemId: UUID,
         @AuthenticationPrincipal user: UserDetails,
         @RequestParam exerciseId: Long,
         @RequestParam sets: Int,
@@ -106,7 +106,7 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
         @RequestParam maxReps: Int,
         @RequestParam rest: Int
     ): String {
-        access.ownedRoutine(id, access.ownerScope(user))
+        access.ownedRoutine(id, access.userId(user))
         validateExercisePlan(sets, minReps, maxReps, rest)
         require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=? AND active=TRUE", Int::class.java, exerciseId) == 1) { "Choose an exercise from the search results." }
         val updated = jdbc.update(
@@ -119,12 +119,12 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
 
     @PostMapping("/routines/{id}/items")
     fun addRoutineItem(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails,
-                       @RequestParam dayId: Long, @RequestParam exerciseId: Long,
+                       @RequestParam dayId: UUID, @RequestParam exerciseId: Long,
                        @RequestParam(defaultValue="3") sets: Int,
                        @RequestParam(defaultValue="8") minReps: Int,
                        @RequestParam(defaultValue="12") maxReps: Int,
                        @RequestParam(defaultValue="90") rest: Int): String {
-        access.ownedRoutine(id, access.ownerScope(user)); access.ownedDay(dayId, id)
+        access.ownedRoutine(id, access.userId(user)); access.ownedDay(dayId, id)
         validateExercisePlan(sets, minReps, maxReps, rest)
         require(jdbc.queryForObject("SELECT count(*) FROM exercise WHERE id=? AND active=TRUE", Int::class.java, exerciseId) == 1) { "Choose an exercise from the search results." }
         val position = jdbc.queryForObject("SELECT coalesce(max(position),0)+1 FROM routine_item WHERE day_id=?", Int::class.java, dayId)!!
@@ -133,9 +133,9 @@ class RoutineController(private val jdbc: JdbcTemplate, private val access: User
     }
 
     @PostMapping("/routines/{routineId}/days/{dayId}/start")
-    fun startRoutine(@PathVariable routineId: UUID, @PathVariable dayId: Long, @AuthenticationPrincipal user: UserDetails): String {
-        val owner = access.ownerScope(user); access.ownedRoutine(routineId, owner); access.ownedDay(dayId, routineId)
-        val routineOwner = jdbc.queryForObject("SELECT owner_id FROM routine WHERE id=?", Long::class.java, routineId)!!
+    fun startRoutine(@PathVariable routineId: UUID, @PathVariable dayId: UUID, @AuthenticationPrincipal user: UserDetails): String {
+        val owner = access.userId(user); access.ownedRoutine(routineId, owner); access.ownedDay(dayId, routineId)
+        val routineOwner = jdbc.queryForObject("SELECT owner_id FROM routine WHERE id=?", UUID::class.java, routineId)!!
         val title = jdbc.queryForObject("SELECT name FROM routine_day WHERE id=?", String::class.java, dayId)!!
         val workout = jdbc.queryForObject("INSERT INTO workout(owner_id,routine_day_id,title) VALUES (?,?,?) RETURNING id", UUID::class.java, routineOwner, dayId, title)!!
         jdbc.update("""INSERT INTO workout_exercise(workout_id,exercise_id,position,instructions_snapshot,planned_sets,min_reps,max_reps,rest_seconds)
