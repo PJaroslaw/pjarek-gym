@@ -34,7 +34,7 @@ docker compose down
 docker volume ls
 ```
 
-Set `APP_PORT` to change the exposed web port. `APP_EXERCISE_SYNC_CRON` sets the Spring cron schedule (default: Sunday at 04:00), and `APP_EXERCISE_SYNC_ZONE` sets its time zone (default: UTC). Set `APP_EXERCISE_SYNC_ON_STARTUP=false` to skip the initial upstream check; the scheduled checks continue. `APP_EXERCISE_SYNC_URL` can point to a compatible upstream ZIP archive. To create users, sign in as an admin and open **User administration**. New accounts are invite-only. Admins can manage accounts and review or manage users' routines and workouts. Personal settings, including weight units and light, dark, or system appearance, are available under **Settings**; system mode follows the device setting.
+Set `APP_PORT` to change the exposed web port. `APP_EXERCISE_SYNC_CRON` sets the Spring cron schedule (default: Sunday at 04:00), and `APP_EXERCISE_SYNC_ZONE` sets its time zone (default: UTC). Set `APP_EXERCISE_SYNC_ON_STARTUP=false` to skip the initial upstream check; the scheduled checks continue. `APP_EXERCISE_SYNC_URL` can point to a compatible upstream ZIP archive. To create users, sign in as an admin and open **User administration**. New accounts are invite-only. Admins can manage accounts and inspect users' routines and workouts in read-only pages. Personal settings, including weight units and light, dark, or system appearance, are available under **Settings**; system mode follows the device setting.
 
 ## Local development
 
@@ -72,3 +72,11 @@ GitHub Actions builds the application and runs unit and integration tests as sep
 ## Exercise data
 
 The catalog and images come from [yuhonas/free-exercise-db](https://github.com/yuhonas/free-exercise-db), distributed under the Unlicense. The source license is included at `src/main/resources/static/exercise-db/LICENSE.md`. The imported fields include exercise name, level, force, mechanic, equipment, primary and secondary muscles, instructions, and image paths. A compact catalog ships with the app for first-start availability; the larger upstream image archive is downloaded only when its ETag changes and is stored in the Docker `exercise_images` volume. Exercises removed upstream are hidden from new searches and plans while remaining available to existing routines and workout history.
+
+## Documentation
+
+- [Architecture](docs/architecture.md) describes the application structure and request flow.
+- [Workout behavior](docs/workouts.md) describes routines, workout sessions, progression, and history.
+- [Data and migrations](docs/data-and-migrations.md) describes identifiers, stored values, and schema evolution.
+- [Development](docs/development.md) covers local setup, tests, and formatting.
+- [Operations](docs/operations.md) covers Compose deployments, configuration, persistent data, and exercise sync.
