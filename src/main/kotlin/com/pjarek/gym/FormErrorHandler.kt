@@ -5,6 +5,7 @@ import java.net.URI
 import org.springframework.dao.DataIntegrityViolationException
 import org.springframework.dao.EmptyResultDataAccessException
 import org.springframework.http.HttpStatus
+import org.springframework.http.ResponseEntity
 import org.springframework.security.access.AccessDeniedException
 import org.springframework.web.bind.MissingServletRequestParameterException
 import org.springframework.web.bind.annotation.ControllerAdvice
@@ -24,7 +25,10 @@ class FormErrorHandler {
     fun notFound() = "not-found"
 
     @ExceptionHandler(IllegalArgumentException::class, MissingServletRequestParameterException::class, MethodArgumentTypeMismatchException::class)
-    fun invalidInput(request: HttpServletRequest, redirect: RedirectAttributes): String {
+    fun invalidInput(request: HttpServletRequest, redirect: RedirectAttributes): Any {
+        if (request.requestURI.startsWith("/api/")) {
+            return ResponseEntity.badRequest().body(mapOf("error" to "Some values are missing or invalid."))
+        }
         redirect.addFlashAttribute("errorMessage", "Some values are missing or invalid. Check the form and try again.")
         return "redirect:${localRefererPath(request) ?: "/"}"
     }
