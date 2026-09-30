@@ -2,3 +2,4 @@ build/
 .gradle/
 node_modules/
 src/main/resources/static/assets/htmx.min.js
+src/main/resources/db/migration/

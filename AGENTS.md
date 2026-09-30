@@ -4,6 +4,7 @@
 
 ## Project constraints
 
+- Name Flyway migrations `V<project-version>_<three-digit-sequence>__description.sql`, using the version in `build.gradle.kts`. Increment the sequence within a project version and restart it at `001` when the project version increases. Never rename or edit a released migration without an explicit, coordinated history conversion.
 - This is a deployed Kotlin and Spring Boot application using PostgreSQL, Thymeleaf, HTMX, and Flyway. The main Kotlin package is `com.pjarek.gym`.
 - Preserve deployed data. Make schema changes with a new forward Flyway migration; do not edit migrations that may already have run or delete database volumes as a substitute for migration work.
 - User, routine, routine-day, routine-item, workout, workout-exercise, workout-set, and workout-event IDs are UUIDs. Exercise catalog IDs are numeric and are the exception.

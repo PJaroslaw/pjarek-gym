@@ -14,9 +14,9 @@ import org.testcontainers.containers.PostgreSQLContainer
 
 class SchemaUpgradeIntegrationTest {
     @Test
-    fun `upgrades deployed v2 records into rep ranges elapsed workout times and kilogram weights`() {
+    fun `upgrades deployed schema records into rep ranges elapsed workout times and kilogram weights`() {
         val dataSource = DriverManagerDataSource(postgres.jdbcUrl, postgres.username, postgres.password)
-        migrate(dataSource, "2")
+        migrate(dataSource, "0.1.0.002")
         val jdbc = JdbcTemplate(dataSource)
         val legacyOwnerId = jdbc.queryForObject(
             "INSERT INTO app_user(username,password_hash,role) VALUES ('migration-test','unused','USER') RETURNING id",
