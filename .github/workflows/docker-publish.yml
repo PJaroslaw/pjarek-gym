@@ -1,41 +1,120 @@
-name: Docker Publish
+name: Docker
 
 on:
   push:
     branches:
       - main
+    tags:
+      - 'v*.*.*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: Release version matching build.gradle.kts (for example v0.1.0)
+        required: true
+        type: string
 
 permissions:
   contents: read
 
 concurrency:
-  group: docker-publish-${{ github.ref }}
+  group: docker-${{ github.ref }}
   cancel-in-progress: false
 
 jobs:
   verify:
-    name: Verify main
+    name: Verify
     uses: ./.github/workflows/build.yml
     permissions:
       contents: read
 
+  prepare:
+    name: Prepare release metadata
+    needs: verify
+    runs-on: ubuntu-latest
+    outputs:
+      is_release: ${{ steps.version.outputs.is_release }}
+      release_tag: ${{ steps.version.outputs.release_tag }}
+      image_version: ${{ steps.version.outputs.image_version }}
+      next_version: ${{ steps.version.outputs.next_version }}
+      publish_latest: ${{ steps.version.outputs.publish_latest }}
+    steps:
+      - name: Check out source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Validate release version
+        id: version
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          REF_NAME: ${{ github.ref_name }}
+          REF_TYPE: ${{ github.ref_type }}
+          REF: ${{ github.ref }}
+          INPUT_VERSION: ${{ inputs.version }}
+        run: |
+          project_version=$(sed -nE 's/^version = "([0-9]+\.[0-9]+\.[0-9]+)"$/\1/p' build.gradle.kts)
+          if [[ -z "$project_version" ]]; then
+            echo "Could not read a numeric project version from build.gradle.kts." >&2
+            exit 1
+          fi
+
+          is_release=false
+          release_tag=""
+          image_version=""
+
+          if [[ "$EVENT_NAME" == "workflow_dispatch" ]]; then
+            if [[ "$REF" != "refs/heads/main" ]]; then
+              echo "Manual releases must be dispatched from main." >&2
+              exit 1
+            fi
+            release_tag="v$project_version"
+            if [[ "$INPUT_VERSION" != "$release_tag" ]]; then
+              echo "Input version '$INPUT_VERSION' must match the project version '$release_tag'." >&2
+              exit 1
+            fi
+            is_release=true
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            release_tag="v$project_version"
+            if [[ "$REF_NAME" != "$release_tag" ]]; then
+              echo "Tag '$REF_NAME' must match the project version '$release_tag'." >&2
+              exit 1
+            fi
+            is_release=true
+          fi
+
+          publish_latest=false
+          next_version=""
+          if [[ "$is_release" == "true" ]]; then
+            image_version="${release_tag#v}"
+            publish_latest=true
+            IFS=. read -r major minor _ <<< "$project_version"
+            next_minor=$((10#$minor + 1))
+            next_version="$major.$next_minor.0"
+          fi
+
+          {
+            echo "is_release=$is_release"
+            echo "release_tag=$release_tag"
+            echo "image_version=$image_version"
+            echo "next_version=$next_version"
+            echo "publish_latest=$publish_latest"
+          } >> "$GITHUB_OUTPUT"
+
   publish:
     name: Publish container image
-    needs: verify
+    needs: prepare
     runs-on: ubuntu-latest
     permissions:
       contents: read
       packages: write
       id-token: write
     steps:
-      - name: Check out main
+      - name: Check out source
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@d7f5e7f509e45cec5c76c4d5afdd7de93d0b3df5 # v4.1.0
+        uses: docker/setup-buildx-action@f87e5991a6d7451dcb8d9637bfbc97413f497069 # v4.4.1
 
       - name: Log in to GitHub Container Registry
-        uses: docker/login-action@c99871dec2022cc055c062a10cc1a1310835ceb4 # v4.3.0
+        uses: docker/login-action@dbcb813823bdd20940b903addbd779551569679f # v4.6.0
         with:
           registry: ghcr.io
           username: ${{ github.actor }}
@@ -47,9 +126,10 @@ jobs:
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
-            type=raw,value=latest
-            type=ref,event=branch
-            type=sha,format=short
+            type=ref,event=branch,enable=${{ github.event_name == 'push' && github.ref_type == 'branch' }}
+            type=semver,pattern={{version}},enable=${{ github.ref_type == 'tag' }}
+            type=raw,value=${{ needs.prepare.outputs.image_version }},enable=${{ github.event_name == 'workflow_dispatch' }}
+            type=raw,value=latest,enable=${{ needs.prepare.outputs.publish_latest == 'true' }}
 
       - name: Build and publish image
         id: image
@@ -71,3 +151,82 @@ jobs:
           TAGS: ${{ steps.metadata.outputs.tags }}
           DIGEST: ${{ steps.image.outputs.digest }}
         run: echo "${TAGS}" | xargs -I {} cosign sign --yes {}@"${DIGEST}"
+
+  release:
+    name: Create GitHub release
+    if: needs.prepare.outputs.is_release == 'true'
+    needs:
+      - prepare
+      - publish
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Create release with generated notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.prepare.outputs.release_tag }}
+          REF_TYPE: ${{ github.ref_type }}
+          SHA: ${{ github.sha }}
+        run: |
+          if gh release view "$RELEASE_TAG" >/dev/null 2>&1; then
+            echo "GitHub release $RELEASE_TAG already exists."
+          elif [[ "$REF_TYPE" == "tag" ]]; then
+            gh release create "$RELEASE_TAG" \
+              --verify-tag \
+              --title "$RELEASE_TAG" \
+              --generate-notes
+          else
+            gh release create "$RELEASE_TAG" \
+              --target "$SHA" \
+              --title "$RELEASE_TAG" \
+              --generate-notes
+          fi
+
+  bump-version:
+    name: Open next minor version PR
+    if: needs.prepare.outputs.is_release == 'true'
+    needs:
+      - prepare
+      - release
+    runs-on: ubuntu-latest
+    permissions:
+      actions: write
+      contents: write
+      pull-requests: write
+    steps:
+      - name: Check out release source
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - name: Set next minor version
+        env:
+          NEXT_VERSION: ${{ needs.prepare.outputs.next_version }}
+        run: sed -i -E "s/^version = \"[0-9]+\.[0-9]+\.[0-9]+\"$/version = \"$NEXT_VERSION\"/" build.gradle.kts
+
+      - name: Create signed draft version bump PR
+        id: pull-request
+        uses: peter-evans/create-pull-request@5f6978faf089d4d20b00c7766989d076bb2fc7f1 # v8.1.1
+        with:
+          token: ${{ secrets.GITHUB_TOKEN }}
+          sign-commits: true
+          branch: release/version-bump-${{ needs.prepare.outputs.next_version }}
+          base: main
+          delete-branch: true
+          draft: always-true
+          add-paths: build.gradle.kts
+          commit-message: 'chore: bump project version to ${{ needs.prepare.outputs.next_version }}'
+          title: 'chore: bump project version to ${{ needs.prepare.outputs.next_version }}'
+          body: |
+            The release `${{ needs.prepare.outputs.release_tag }}` is published.
+
+            Bump the project version to `${{ needs.prepare.outputs.next_version }}` for the next development cycle.
+
+      - name: Run build workflow for the version bump PR
+        if: steps.pull-request.outputs.pull-request-number != ''
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          VERSION_BRANCH: release/version-bump-${{ needs.prepare.outputs.next_version }}
+        run: gh workflow run build.yml --ref "$VERSION_BRANCH"
