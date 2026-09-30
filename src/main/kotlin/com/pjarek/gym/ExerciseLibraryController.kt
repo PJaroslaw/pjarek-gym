@@ -17,10 +17,8 @@ import org.springframework.web.bind.annotation.ResponseBody
 class ExerciseLibraryController(private val jdbc: JdbcTemplate, private val exerciseSearch: ExerciseSearchService, @Value("\${app.exercise-image-dir}") private val imageDir: String) {
     @GetMapping("/exercises")
     fun exercises(@RequestParam(defaultValue="") q: String, @RequestHeader(name="HX-Request", required=false) hx: String?, model: Model): String {
-        require(q.length <= 100) { "Search terms can be up to 100 characters." }
-        val term = "%${q.trim()}%"
         model.addAttribute("q", q)
-        model.addAttribute("exercises", jdbc.queryForList("SELECT id,name,category,equipment,primary_muscles,source_id FROM exercise WHERE active=TRUE AND (name ILIKE ? OR primary_muscles ILIKE ? OR equipment ILIKE ?) ORDER BY name LIMIT 200", term, term, term))
+        model.addAttribute("exercises", exerciseSearch.searchLibrary(q))
         return if (hx != null) "fragments/exercises :: rows" else "exercises"
     }
 

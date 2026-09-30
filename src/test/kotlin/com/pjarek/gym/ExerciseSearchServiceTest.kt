@@ -19,4 +19,16 @@ class ExerciseSearchServiceTest {
             service.search("x".repeat(101))
         }
     }
+
+    @Test
+    fun `library search terms longer than 100 characters are rejected`() {
+        assertThrows(IllegalArgumentException::class.java) {
+            service.searchLibrary("x".repeat(101))
+        }
+    }
+
+    @Test
+    fun `searches without alphanumeric terms return no results without querying the database`() {
+        assertEquals(emptyList<Map<String, Any?>>(), service.search("!!"))
+    }
 }
