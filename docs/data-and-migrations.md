@@ -24,14 +24,10 @@ Routine and workout exercise rows keep the planned set count, rep range, and res
 
 Set weights are stored as kilograms regardless of the user's selected display unit. `app_user.weight_unit` controls conversion for input and display. Theme preference is stored per user as `LIGHT`, `DARK`, or `SYSTEM`.
 
-## Migration history
+## Migration naming
 
-| Version | Change                                                                                       |
-| ------- | -------------------------------------------------------------------------------------------- |
-| V1      | Initial accounts, exercise catalog, routines, workouts, sets, and events                     |
-| V2      | Temporary-password change requirement                                                        |
-| V3      | Rep ranges, workout elapsed timing, and conversion of stored pound values to kilograms       |
-| V4      | UUID identifiers for user-owned entities and references; exercise catalog IDs remain numeric |
-| V5      | PostgreSQL `pg_trgm` extension for typo-tolerant exercise search                             |
+Name versioned migrations `V<project-version>_<three-digit-sequence>__description.sql`, using the project version set in `build.gradle.kts`. For example, the first migration for project version `0.1.0` is `V0.1.0_001__add_training_note.sql`; later migrations in that project version increment the sequence. Start again at `001` when the project version increases. Flyway normalizes the underscore separator to a dot in its stored version, so that filename is recorded as `0.1.0.001`. Keep project versions increasing and migration versions unique.
+
+Descriptions explain the change; versions determine execution order. Once a migration is released, keep its filename and SQL unchanged.
 
 The app has deployed databases. For a schema change, add the next Flyway migration and verify it from the current deployed schema with the schema-upgrade integration test. Do not rewrite an already released migration, drop a persistent volume, or reset data as a migration strategy. Back up a database before deploying a schema change.
