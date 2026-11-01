@@ -12,25 +12,25 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestParam
 
 @Controller
-class AdminController(private val accounts: AccountService) {
+class AdminController(private val accountService: AccountService) {
     @GetMapping("/admin/users")
     fun adminUsers(@AuthenticationPrincipal user: UserDetails, model: Model): String {
         requireAdmin(user)
-        model.addAttribute("users", accounts.allAccounts())
+        model.addAttribute("users", accountService.allAccounts())
         return "admin-users"
     }
 
     @GetMapping("/admin/users/{id}")
     fun adminUserEdit(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, model: Model): String {
         requireAdmin(user)
-        model.addAttribute("account", accounts.adminAccount(id))
+        model.addAttribute("account", accountService.adminAccount(id))
         return "admin-user-edit"
     }
 
     @PostMapping("/admin/users/{id}/delete")
     fun deleteUser(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails): String {
         requireAdmin(user)
-        accounts.delete(id, user.username)
+        accountService.delete(id, user.username)
         return "redirect:/admin/users"
     }
 
@@ -38,14 +38,14 @@ class AdminController(private val accounts: AccountService) {
     fun createUser(@AuthenticationPrincipal user: UserDetails, @RequestParam username: String,
                    @RequestParam password: String, @RequestParam role: String, @RequestParam temporaryPassword: Boolean): String {
         requireAdmin(user)
-        accounts.create(username, password, role, temporaryPassword)
+        accountService.create(username, password, role, temporaryPassword)
         return "redirect:/admin/users"
     }
 
     @PostMapping("/admin/users/{id}/enabled")
     fun toggleUser(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam enabled: Boolean): String {
         requireAdmin(user)
-        accounts.setEnabled(id, user.username, enabled)
+        accountService.setEnabled(id, user.username, enabled)
         return "redirect:/admin/users/$id"
     }
 
@@ -53,7 +53,7 @@ class AdminController(private val accounts: AccountService) {
     fun adminResetPassword(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails,
                            @RequestParam password: String, @RequestParam temporaryPassword: Boolean): String {
         requireAdmin(user)
-        accounts.resetPassword(id, password, temporaryPassword)
+        accountService.resetPassword(id, password, temporaryPassword)
         return "redirect:/admin/users/$id"
     }
 

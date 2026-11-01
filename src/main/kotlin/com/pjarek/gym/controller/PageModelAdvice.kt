@@ -8,13 +8,13 @@ import org.springframework.web.bind.annotation.ControllerAdvice
 import org.springframework.web.bind.annotation.ModelAttribute
 
 @ControllerAdvice
-class PageModelAdvice(private val accounts: AccountService) {
+class PageModelAdvice(private val accountService: AccountService) {
     @ModelAttribute
     fun common(model: Model, @AuthenticationPrincipal user: UserDetails?) {
         if (user != null) {
             model.addAttribute("username", user.username)
             model.addAttribute("isAdmin", user.authorities.any { it.authority == "ROLE_ADMIN" })
-            val account = accounts.account(user.username)
+            val account = accountService.account(user.username)
             model.addAttribute("weightUnit", account.weightUnit)
             model.addAttribute("themeMode", account.themeMode)
         }

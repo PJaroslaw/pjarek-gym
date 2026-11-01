@@ -12,12 +12,12 @@ import org.springframework.web.bind.annotation.GetMapping
 import org.springframework.web.bind.annotation.RequestParam
 
 @Controller
-class DashboardController(private val service: DashboardService, private val access: UserAccess) {
+class DashboardController(private val dashboardService: DashboardService, private val userAccess: UserAccess) {
     @GetMapping("/")
     fun home(@AuthenticationPrincipal user: UserDetails, model: Model,
              @RequestParam(required = false) month: String?,
              @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) day: LocalDate?): String {
-        val page = service.overview(access.userId(user), month, day)
+        val page = dashboardService.overview(userAccess.userId(user), month, day)
         model.addAttribute("calendar", page.calendar)
         model.addAttribute("username", user.username)
         model.addAttribute("routines", page.routines)
@@ -36,7 +36,7 @@ class DashboardController(private val service: DashboardService, private val acc
     fun history(@AuthenticationPrincipal user: UserDetails, model: Model,
                 @RequestParam(required = false) month: String?,
                 @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) day: LocalDate?): String {
-        val page = service.history(access.userId(user), month, day)
+        val page = dashboardService.history(userAccess.userId(user), month, day)
         model.addAttribute("calendar", page.calendar)
         model.addAttribute("history", page.history)
         model.addAttribute("records", page.records)

@@ -16,10 +16,10 @@ import org.springframework.web.bind.annotation.PostMapping
 import org.springframework.web.bind.annotation.RequestParam
 
 @Controller
-class WorkoutController(private val service: WorkoutService, private val access: UserAccess) {
+class WorkoutController(private val workoutService: WorkoutService, private val userAccess: UserAccess) {
     @PostMapping("/workouts/ad-hoc")
     fun startAdHoc(@AuthenticationPrincipal user: UserDetails, @RequestParam(required = false) exerciseId: Long?): String {
-        val (workout, item) = service.startAdHoc(access.userId(user), exerciseId)
+        val (workout, item) = workoutService.startAdHoc(userAccess.userId(user), exerciseId)
         return if (item == null) "redirect:/workouts/$workout" else "redirect:/workouts/$workout?exercise=$item"
     }
 
@@ -27,7 +27,7 @@ class WorkoutController(private val service: WorkoutService, private val access:
     fun workout(@PathVariable id: UUID, @RequestParam(required = false) exercise: UUID?,
                 @RequestParam(required = false) restSeconds: Int?, @RequestParam(required = false) restStartedAt: Long?,
                 @AuthenticationPrincipal user: UserDetails, model: Model): String {
-        val page = service.page(id, access.userId(user), exercise, restSeconds, restStartedAt)
+        val page = workoutService.page(id, userAccess.userId(user), exercise, restSeconds, restStartedAt)
         model.addAttribute("restRemainingMillis", page.restRemainingMillis)
         model.addAttribute("workout", page.workout)
         model.addAttribute("workoutElapsedSeconds", page.workout["displayed_elapsed_seconds"])
@@ -52,39 +52,39 @@ class WorkoutController(private val service: WorkoutService, private val access:
 
     @PostMapping("/workouts/{id}/exercises")
     fun addWorkoutExercise(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam exerciseId: Long): String =
-        "redirect:/workouts/$id?exercise=${service.addExercise(id, access.userId(user), exerciseId)}"
+        "redirect:/workouts/$id?exercise=${workoutService.addExercise(id, userAccess.userId(user), exerciseId)}"
 
     @PostMapping("/workouts/{id}/sets")
     fun logSet(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam itemId: UUID,
                @RequestParam reps: Int, @RequestParam weight: BigDecimal): String {
-        val logged = service.logSet(id, access.userId(user), itemId, reps, weight)
+        val logged = workoutService.logSet(id, userAccess.userId(user), itemId, reps, weight)
         return "redirect:/workouts/$id?exercise=${logged.itemId}&restSeconds=${logged.restSeconds}&restStartedAt=${logged.restStartedAt}"
     }
 
     @PostMapping("/workouts/{id}/sets/{setId}/edit")
     fun editWorkoutSet(@PathVariable id: UUID, @PathVariable setId: UUID, @AuthenticationPrincipal user: UserDetails,
                        @RequestParam reps: Int, @RequestParam weight: BigDecimal): String =
-        "redirect:/workouts/$id?exercise=${service.editSet(id, access.userId(user), setId, reps, weight)}"
+        "redirect:/workouts/$id?exercise=${workoutService.editSet(id, userAccess.userId(user), setId, reps, weight)}"
 
     @PostMapping("/workouts/{id}/sets/{setId}/delete")
     fun deleteWorkoutSet(@PathVariable id: UUID, @PathVariable setId: UUID, @AuthenticationPrincipal user: UserDetails): String =
-        "redirect:/workouts/$id?exercise=${service.deleteSet(id, access.userId(user), setId)}"
+        "redirect:/workouts/$id?exercise=${workoutService.deleteSet(id, userAccess.userId(user), setId)}"
 
     @PostMapping("/workouts/{id}/finish")
     fun finishWorkout(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails): String {
-        service.finish(id, access.userId(user))
+        workoutService.finish(id, userAccess.userId(user))
         return "redirect:/"
     }
 
     @PostMapping("/workouts/{id}/pause")
     fun pause(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam(required = false) exercise: UUID?): String {
-        service.pause(id, access.userId(user))
+        workoutService.pause(id, userAccess.userId(user))
         return workoutRedirect(id, exercise)
     }
 
     @PostMapping("/workouts/{id}/resume")
     fun resume(@PathVariable id: UUID, @AuthenticationPrincipal user: UserDetails, @RequestParam(required = false) exercise: UUID?): String {
-        service.resume(id, access.userId(user))
+        workoutService.resume(id, userAccess.userId(user))
         return workoutRedirect(id, exercise)
     }
 
@@ -97,7 +97,7 @@ class WorkoutController(private val service: WorkoutService, private val access:
             "history" -> if (day == null) "redirect:/history" else "redirect:/history?day=$day"
             else -> throw IllegalArgumentException("Unknown workout deletion destination")
         }
-        service.delete(id, access.userId(user))
+        workoutService.delete(id, userAccess.userId(user))
         return destination
     }
 

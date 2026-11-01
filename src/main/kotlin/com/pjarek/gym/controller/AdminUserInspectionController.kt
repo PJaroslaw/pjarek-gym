@@ -13,13 +13,13 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.server.ResponseStatusException
 
 @Controller
-class AdminUserInspectionController(private val inspection: AdminInspectionService) {
+class AdminUserInspectionController(private val adminInspectionService: AdminInspectionService) {
     @GetMapping("/admin/users/{id}/inspect")
     fun inspectUser(@PathVariable id: UUID, @RequestParam(defaultValue = "0") routinesPage: Int,
                     @RequestParam(defaultValue = "0") sessionsPage: Int,
                     @AuthenticationPrincipal user: UserDetails, model: Model): String {
         requireAdmin(user)
-        val page = inspection.inspect(id, routinesPage, sessionsPage)
+        val page = adminInspectionService.inspect(id, routinesPage, sessionsPage)
         model.addAttribute("account", page.account)
         model.addAttribute("routineCount", page.routineCount)
         model.addAttribute("routines", page.routines)
@@ -37,7 +37,7 @@ class AdminUserInspectionController(private val inspection: AdminInspectionServi
     fun inspectRoutine(@PathVariable id: UUID, @PathVariable routineId: UUID,
                        @AuthenticationPrincipal user: UserDetails, model: Model): String {
         requireAdmin(user)
-        val detail = inspection.routine(id, routineId)
+        val detail = adminInspectionService.routine(id, routineId)
         model.addAttribute("account", detail.account)
         model.addAttribute("routine", detail.routine)
         model.addAttribute("days", detail.days)
@@ -49,7 +49,7 @@ class AdminUserInspectionController(private val inspection: AdminInspectionServi
     fun inspectWorkout(@PathVariable id: UUID, @PathVariable workoutId: UUID,
                        @AuthenticationPrincipal user: UserDetails, model: Model): String {
         requireAdmin(user)
-        val detail = inspection.workout(id, workoutId)
+        val detail = adminInspectionService.workout(id, workoutId)
         model.addAttribute("account", detail.account)
         model.addAttribute("workout", detail.workout)
         model.addAttribute("workoutExercises", detail.exercises)

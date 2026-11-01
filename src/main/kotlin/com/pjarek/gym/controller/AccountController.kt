@@ -12,7 +12,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseStatus
 
 @Controller
-class AccountController(private val accounts: AccountService) {
+class AccountController(private val accountService: AccountService) {
     @GetMapping("/login") fun login() = "login"
 
     @RequestMapping("/forbidden")
@@ -21,29 +21,29 @@ class AccountController(private val accounts: AccountService) {
 
     @PostMapping("/settings/weight-unit")
     fun updateWeightUnit(@AuthenticationPrincipal user: UserDetails, @RequestParam unit: String): String {
-        accounts.updateWeightUnit(user.username, unit)
+        accountService.updateWeightUnit(user.username, unit)
         return "redirect:/settings"
     }
 
     @PostMapping("/settings/theme-mode")
     fun updateThemeMode(@AuthenticationPrincipal user: UserDetails, @RequestParam mode: String): String {
-        accounts.updateThemeMode(user.username, mode)
+        accountService.updateThemeMode(user.username, mode)
         return "redirect:/settings"
     }
 
     @PostMapping("/settings/password")
     fun changePassword(@AuthenticationPrincipal user: UserDetails, @RequestParam currentPassword: String, @RequestParam newPassword: String): String {
-        accounts.changePassword(user.username, currentPassword, newPassword)
+        accountService.changePassword(user.username, currentPassword, newPassword)
         return "redirect:/settings?passwordChanged"
     }
 
     @GetMapping("/change-password")
     fun requiredPasswordChange(@AuthenticationPrincipal user: UserDetails): String =
-        if (accounts.account(user.username).mustChangePassword) "change-password" else "redirect:/"
+        if (accountService.account(user.username).mustChangePassword) "change-password" else "redirect:/"
 
     @PostMapping("/change-password")
     fun saveRequiredPasswordChange(@AuthenticationPrincipal user: UserDetails, @RequestParam newPassword: String): String {
-        accounts.saveRequiredPassword(user.username, newPassword)
+        accountService.saveRequiredPassword(user.username, newPassword)
         return "redirect:/"
     }
 }

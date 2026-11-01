@@ -15,21 +15,21 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseBody
 
 @Controller
-class ExerciseLibraryController(private val library: ExerciseLibraryService, private val exerciseSearch: ExerciseSearchService, @Value("\${app.exercise-image-dir}") private val imageDir: String) {
+class ExerciseLibraryController(private val exerciseLibraryService: ExerciseLibraryService, private val exerciseSearchService: ExerciseSearchService, @Value("\${app.exercise-image-dir}") private val imageDir: String) {
     @GetMapping("/exercises")
     fun exercises(@RequestParam(defaultValue="") q: String, @RequestHeader(name="HX-Request", required=false) hx: String?, model: Model): String {
         model.addAttribute("q", q)
-        model.addAttribute("exercises", exerciseSearch.searchLibrary(q))
+        model.addAttribute("exercises", exerciseSearchService.searchLibrary(q))
         return if (hx != null) "fragments/exercises :: rows" else "exercises"
     }
 
     @ResponseBody
     @GetMapping("/api/exercises/search")
-    fun searchExercises(@RequestParam(defaultValue = "") q: String) = exerciseSearch.search(q)
+    fun searchExercises(@RequestParam(defaultValue = "") q: String) = exerciseSearchService.search(q)
 
     @GetMapping("/exercise/{id}")
     fun exercise(@PathVariable id: Long, model: Model): String {
-        model.addAttribute("exercise", library.exercise(id))
+        model.addAttribute("exercise", exerciseLibraryService.exercise(id))
         return "exercise-detail"
     }
 
@@ -37,7 +37,7 @@ class ExerciseLibraryController(private val library: ExerciseLibraryService, pri
     fun image(@PathVariable sourceId: String, @PathVariable index: Int, response: HttpServletResponse) {
         val base = Path.of(imageDir).toAbsolutePath().normalize()
         Files.createDirectories(base)
-        val path = library.imagePath(sourceId, index)
+        val path = exerciseLibraryService.imagePath(sourceId, index)
         if (path == null) { response.sendError(404); return }
         val currentImage = base.resolve("current/exercises/$path").normalize()
         val legacyImage = base.resolve("exercises/$path").normalize()
