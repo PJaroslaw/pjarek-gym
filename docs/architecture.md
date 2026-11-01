@@ -4,19 +4,22 @@ PJarek Gym Log is a server-rendered web application. Kotlin and Spring Boot hand
 
 ## Request and data flow
 
-Controllers in `src/main/kotlin/com/pjarek/gym` handle page and form routes. They use `JdbcTemplate` for SQL and return Thymeleaf template names. `UserAccess` resolves the signed-in account and checks ownership before user data is read or changed. Flyway applies database schema changes when the application starts.
+Controllers in `src/main/kotlin/com/pjarek/gym/controller` handle page and form routes and return Thymeleaf template names. Classes in `service` validate input, enforce ownership through `UserAccess`, coordinate writes, and prepare view data. Classes in `repository` own SQL and use `NamedParameterJdbcTemplate` with row mappers to read PostgreSQL results. Shared data classes live in `model`; typed JDBC mappings live in `mapper`. Complex Thymeleaf projections use `ColumnMapRowMapper` to preserve their field names. Security and startup configuration live in `config`. Flyway applies database schema changes when the application starts.
 
 Templates live in `src/main/resources/templates`. Page templates compose fragments from `templates/fragments`; an `HX-Request` can return a fragment instead of a complete page. CSS and JavaScript are served from `src/main/resources/static/assets`. HTMX is bundled locally rather than loaded from a CDN.
 
+`GymApplication` stays in the root `com.pjarek.gym` package so Spring scans the subpackages. Unit tests mirror the relevant packages; cross-cutting PostgreSQL tests live in `src/test/kotlin/com/pjarek/gym/integration`.
+
 ## Main components
 
-| Area                  | Code                                                                                                          | Responsibility                                                                      |
-| --------------------- | ------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Accounts and access   | `SecurityConfig`, `UserAccess`, `AccountController`, `AdminController`                                        | Form login, user preferences, password changes, and admin account actions           |
-| Routines and workouts | `RoutineController`, `WorkoutController`, `DashboardController`                                               | Plans, training sessions, set logging, timers, overview, and history                |
-| Exercise catalog      | `ExerciseLibraryController`, `ExerciseSearchService`, `ExerciseCatalogImporter`, `ExerciseDatasetSyncService` | Catalog search, catalog import, and local image synchronization                     |
-| Views and assets      | `templates/`, `static/assets/`                                                                                | Server-rendered pages, partial updates, styling, and small client-side interactions |
-| Database              | `db/migration/`                                                                                               | Versioned PostgreSQL schema managed by Flyway                                       |
+| Area                  | Code                                                                                                                                | Responsibility                                                                      |
+| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
+| Accounts and access   | `SecurityConfig`, `UserAccess`, `AccountController`, `AdminController`, `AccountService`, `AccountRepository`                       | Form login, user preferences, password changes, and admin account actions           |
+| Routines and workouts | `RoutineController`, `WorkoutController`, `DashboardController`, their services and repositories                                    | Plans, training sessions, set logging, timers, overview, and history                |
+| Exercise catalog      | `ExerciseLibraryController`, `ExerciseSearchService`, `ExerciseRepository`, `ExerciseCatalogImporter`, `ExerciseDatasetSyncService` | Catalog search, catalog import, and local image synchronization                     |
+| Admin inspection      | `AdminUserInspectionController`, `AdminInspectionService`, `AdminInspectionRepository`                                              | Read-only, paginated inspection of an account's routines and workouts               |
+| Views and assets      | `templates/`, `static/assets/`                                                                                                      | Server-rendered pages, partial updates, styling, and small client-side interactions |
+| Database              | `db/migration/`                                                                                                                     | Versioned PostgreSQL schema managed by Flyway                                       |
 
 ## Authentication and authorization
 

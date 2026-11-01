@@ -37,4 +37,4 @@ npm run format:check
 
 ## Code layout
 
-Kotlin sources are under `src/main/kotlin/com/pjarek/gym`. Keep domain and HTTP handling in focused controllers and services, use SQL through `JdbcTemplate`, and use imports instead of fully qualified names in code. Add happy-path and failure-path tests for changed behavior. See [Architecture](architecture.md) for the component map and [Data and migrations](data-and-migrations.md) for schema conventions.
+Kotlin sources are under `src/main/kotlin/com/pjarek/gym`. Put HTTP adapters in `controller`, business rules and coordination in `service`, SQL in `repository`, shared data classes in `model`, typed JDBC mappings in `mapper`, and Spring configuration in `config`. Repositories use `NamedParameterJdbcTemplate` and row mappers. Put focused unit tests in matching test packages and PostgreSQL application flows in `src/test/kotlin/com/pjarek/gym/integration`. Keep imports instead of fully qualified names in code. Add happy-path and failure-path tests for changed behavior. See [Architecture](architecture.md) for the component map and [Data and migrations](data-and-migrations.md) for schema conventions.

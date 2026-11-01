@@ -34,9 +34,9 @@
     <div class="record-row user-account-row" th:each="u:${users}">
       <span>
         <strong th:text="${u.username}">user</strong>
-        <small th:text="${u.role} + ' · ' + ${u.created_at}">Role</small>
+        <small th:text="${u.role} + ' · ' + ${u.createdAt}">Role</small>
         <small th:text="${u.enabled} ? 'Enabled' : 'Disabled'">Enabled</small>
-        <small th:if="${u.must_change_password}">Temporary password · change required</small>
+        <small th:if="${u.mustChangePassword}">Temporary password · change required</small>
       </span>
       <div class="user-row-actions">
         <a class="button secondary small" th:href="@{/admin/users/{id}/inspect(id=${u.id})}">Inspect</a>

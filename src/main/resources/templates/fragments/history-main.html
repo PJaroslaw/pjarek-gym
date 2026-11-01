@@ -27,7 +27,7 @@
         <span>
           <strong class="history-session-title" th:text="${w.title}">Workout</strong>
           <small
-            th:text="${#dates.format(w.completed_at,'d MMM yyyy · HH:mm')} + ' · ' + ${w.sets} + ' sets · ' + ${w.durationLabel}"
+            th:text="${#dates.format(w.completedAt,'d MMM yyyy · HH:mm')} + ' · ' + ${w.sets} + ' sets · ' + ${w.durationLabel}"
           >
             Date
           </small>
@@ -56,7 +56,7 @@
       <div class="record-row" th:each="r:${records}">
         <span>
           <strong th:text="${r.name}">Exercise</strong>
-          <small th:text="${r.max_reps} + ' reps best'">reps</small>
+          <small th:text="${r.maxReps} + ' reps best'">reps</small>
         </span>
         <strong th:text="|${r.displayWeight} ${r.weightUnit}|">weight</strong>
       </div>
