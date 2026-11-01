@@ -40,6 +40,7 @@ class RoutineBuilderIntegrationTest : IntegrationTestSupport() {
     fun `AI generated draft can be refined and saved only after user confirmation`() {
         val owner = testUserId()
         val session = MockHttpSession()
+        val exerciseIds = activeExerciseIds()
 
         mockMvc.perform(
             org.springframework.test.web.servlet.request.MockMvcRequestBuilders.multipart("/routine-builder/generate")
@@ -67,11 +68,23 @@ class RoutineBuilderIntegrationTest : IntegrationTestSupport() {
                 .param("changeRequest", "Make the sessions shorter")
                 .param("days[0].name", "Day one")
                 .param("days[0].exercises[0].exerciseName", "Catalog exercise")
-                .param("days[0].exercises[0].exerciseId", activeExerciseId().toString())
+                .param("days[0].exercises[0].exerciseId", exerciseIds[0].toString())
                 .param("days[0].exercises[0].sets", "3")
                 .param("days[0].exercises[0].minReps", "8")
                 .param("days[0].exercises[0].maxReps", "12")
                 .param("days[0].exercises[0].restSeconds", "90")
+                .param("days[0].exercises[1].exerciseName", "Catalog exercise two")
+                .param("days[0].exercises[1].exerciseId", exerciseIds[1].toString())
+                .param("days[0].exercises[1].sets", "3")
+                .param("days[0].exercises[1].minReps", "8")
+                .param("days[0].exercises[1].maxReps", "12")
+                .param("days[0].exercises[1].restSeconds", "90")
+                .param("days[0].exercises[2].exerciseName", "Catalog exercise three")
+                .param("days[0].exercises[2].exerciseId", exerciseIds[2].toString())
+                .param("days[0].exercises[2].sets", "3")
+                .param("days[0].exercises[2].minReps", "8")
+                .param("days[0].exercises[2].maxReps", "12")
+                .param("days[0].exercises[2].restSeconds", "90")
         )
             .andExpect(status().isOk)
             .andExpect(content().string(org.hamcrest.Matchers.containsString("Updated after refinement")))
@@ -222,6 +235,10 @@ class RoutineBuilderIntegrationTest : IntegrationTestSupport() {
         "SELECT id FROM exercise WHERE active=TRUE ORDER BY id LIMIT 1", Long::class.java
     )!!
 
+    private fun activeExerciseIds(): List<Long> = jdbc.queryForList(
+        "SELECT id FROM exercise WHERE active=TRUE ORDER BY id LIMIT 3", Long::class.java
+    ).filterNotNull()
+
     private fun routineCount(owner: UUID): Int = jdbc.queryForObject(
         "SELECT count(*) FROM routine WHERE owner_id=?", Int::class.java, owner
     )!!
@@ -237,18 +254,18 @@ class RoutineBuilderTestConfiguration {
             catalog: List<Map<String, Any?>>,
             sourceFile: RoutineSourceFile?
         ): RoutineDraft {
-            val exercise = catalog.first()
+            val exercises = catalog.take(3)
             return RoutineDraft(
                 "Generated routine",
                 "Generated summary",
-                mutableListOf(
+                (1..request.daysPerWeek).map { dayNumber ->
                     RoutineDraftDay(
-                        "Day one",
-                        mutableListOf(
+                        "Day $dayNumber",
+                        exercises.map { exercise ->
                             RoutineDraftExercise((exercise["id"] as Number).toLong(), exercise["name"].toString())
-                        )
+                        }.toMutableList()
                     )
-                )
+                }.toMutableList()
             )
         }
 
