@@ -29,6 +29,7 @@ dependencies {
     testImplementation("org.testcontainers:testcontainers-junit-jupiter")
     testImplementation("org.testcontainers:testcontainers-postgresql")
     implementation("org.flywaydb:flyway-database-postgresql")
+    implementation("org.apache.pdfbox:pdfbox:3.0.8")
     runtimeOnly("org.postgresql:postgresql")
     implementation(kotlin("reflect"))
 }

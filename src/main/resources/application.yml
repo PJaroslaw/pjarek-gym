@@ -16,6 +16,11 @@ spring:
     enabled: true
   thymeleaf:
     cache: true
+  servlet:
+    multipart:
+      max-file-size: 10MB
+      max-request-size: 11MB
+      file-size-threshold: 10MB
 app:
   admin:
     username: ${APP_ADMIN_USERNAME:}
@@ -26,3 +31,8 @@ app:
     cron: ${APP_EXERCISE_SYNC_CRON:0 0 4 * * SUN}
     zone: ${APP_EXERCISE_SYNC_ZONE:UTC}
     on-startup: ${APP_EXERCISE_SYNC_ON_STARTUP:true}
+  ai:
+    provider: ${APP_AI_PROVIDER:openai}
+    api-key: ${APP_AI_API_KEY:}
+    base-url: ${APP_AI_BASE_URL:}
+    model: ${APP_AI_MODEL:}

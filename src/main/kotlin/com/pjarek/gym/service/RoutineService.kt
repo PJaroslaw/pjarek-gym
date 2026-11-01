@@ -1,6 +1,7 @@
 package com.pjarek.gym.service
 
 import com.pjarek.gym.model.RoutineDetail
+import com.pjarek.gym.model.RoutineDraft
 import com.pjarek.gym.repository.ExerciseRepository
 import com.pjarek.gym.repository.RoutineRepository
 import com.pjarek.gym.repository.WorkoutRepository
@@ -21,6 +22,24 @@ class RoutineService(
         val routineName = name?.trim().orEmpty()
         require(routineName.isNotBlank() && routineName.length <= 160) { "Enter a name for your routine." }
         return routineRepository.create(owner, routineName)
+    }
+
+    @Transactional
+    fun saveDraft(owner: UUID, draft: RoutineDraft): UUID {
+        val routineName = draft.name.trim()
+        require(routineName.isNotBlank() && routineName.length <= 160) { "Enter a valid routine name." }
+        require(draft.days.isNotEmpty()) { "Add at least one day to the routine." }
+        val routineId = routineRepository.create(owner, routineName)
+        draft.days.forEach { day ->
+            val dayId = routineRepository.addDay(routineId, day.name.trim())
+            day.exercises.forEach { exercise ->
+                require(exerciseRepository.active(exercise.exerciseId)) { "Choose each exercise from the active exercise library." }
+                routineRepository.addItem(
+                    dayId, exercise.exerciseId, exercise.sets, exercise.minReps, exercise.maxReps, exercise.restSeconds
+                )
+            }
+        }
+        return routineId
     }
 
     fun detail(id: UUID, owner: UUID): RoutineDetail {

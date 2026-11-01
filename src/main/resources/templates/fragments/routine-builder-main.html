@@ -1,0 +1,360 @@
+<main xmlns:th="http://www.thymeleaf.org">
+  <a class="back-link" href="/routines">← All routines</a>
+  <div class="page-title">
+    <div>
+      <span class="eyebrow">YOUR PLAN, YOUR CALL</span>
+      <h1>Routine builder</h1>
+      <p>Start with your goals or bring a routine you already like. You stay in control of the final plan.</p>
+    </div>
+  </div>
+  <div class="content-error" role="alert" th:if="${builderError}" th:text="${builderError}"></div>
+  <div
+    class="routine-builder-feedback routine-builder-feedback--warning"
+    role="alert"
+    aria-live="assertive"
+    th:if="${builderWarning}"
+    th:text="${builderWarning}"
+  ></div>
+  <div
+    class="routine-builder-feedback routine-builder-feedback--success"
+    role="status"
+    aria-live="polite"
+    th:if="${builderNotice}"
+    th:text="${builderNotice}"
+  ></div>
+  <section class="panel routine-ai-notice">
+    <strong>Review before you save</strong>
+    <p>
+      AI generated plans can make mistakes and are not medical advice. Your preferences and any selected file are sent
+      to the AI provider configured by the app administrator. The app does not keep the uploaded file.
+    </p>
+  </section>
+  <section class="panel routine-builder-start" th:if="${draft == null}">
+    <h2>What would help you train?</h2>
+    <p class="muted" th:if="${!aiEnabled}">
+      AI routine building is turned off. The app administrator can configure an AI provider.
+    </p>
+    <form
+      method="post"
+      action="/routine-builder/generate"
+      enctype="multipart/form-data"
+      data-ai-progress-form
+      th:attr="aria-disabled=${!aiEnabled}"
+    >
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <div class="routine-builder-fields">
+        <label class="routine-builder-wide">
+          Your main goal (optional when importing a file)
+          <textarea
+            name="goal"
+            maxlength="1000"
+            placeholder="Build strength, improve general fitness, prepare for a hiking trip…"
+            th:disabled="${!aiEnabled}"
+          ></textarea>
+        </label>
+        <label>
+          Training days per week
+          <select name="daysPerWeek" th:disabled="${!aiEnabled}">
+            <option value="2">2 days</option>
+            <option value="3" selected>3 days</option>
+            <option value="4">4 days</option>
+            <option value="5">5 days</option>
+            <option value="6">6 days</option>
+            <option value="7">7 days</option>
+          </select>
+        </label>
+        <label>
+          Experience
+          <select name="experience" th:disabled="${!aiEnabled}">
+            <option value="beginner">New to training</option>
+            <option value="intermediate" selected>Some experience</option>
+            <option value="advanced">Experienced</option>
+          </select>
+        </label>
+        <label>
+          Minutes per session
+          <input
+            type="number"
+            name="sessionMinutes"
+            min="15"
+            max="180"
+            value="60"
+            required
+            th:disabled="${!aiEnabled}"
+          />
+        </label>
+        <label>
+          Equipment you have
+          <input
+            type="text"
+            name="equipment"
+            maxlength="1000"
+            placeholder="Full gym, dumbbells at home, resistance bands…"
+            th:disabled="${!aiEnabled}"
+          />
+        </label>
+        <label class="routine-builder-wide">
+          Limitations or preferences
+          <textarea
+            name="limitations"
+            maxlength="1000"
+            placeholder="Movements you avoid, areas you want to focus on, or anything else to account for…"
+            th:disabled="${!aiEnabled}"
+          ></textarea>
+        </label>
+        <label class="routine-builder-wide">
+          Or import a routine image or PDF
+          <input
+            type="file"
+            name="sourceFile"
+            accept="application/pdf,image/jpeg,image/png,image/webp"
+            th:disabled="${!aiEnabled}"
+          />
+          <small>PDF, JPEG, PNG, or WebP. Maximum 10 MB.</small>
+        </label>
+      </div>
+      <button class="button primary" type="submit" data-ai-submit th:disabled="${!aiEnabled}">
+        <span data-ai-idle-label>Create a draft</span>
+        <span data-ai-pending-label hidden>Creating draft…</span>
+      </button>
+      <p class="routine-ai-progress" data-ai-progress role="status" aria-live="polite" hidden>
+        <span class="routine-ai-spinner" aria-hidden="true"></span>
+        <span>Creating your draft. Keep this page open; the local model may take a little while to start.</span>
+      </p>
+    </form>
+  </section>
+  <section class="panel routine-draft-panel" th:if="${draft != null}">
+    <div class="section-heading">
+      <div>
+        <span class="eyebrow">EDITABLE DRAFT</span>
+        <h2>Make this plan yours</h2>
+        <p th:if="${draft.summary}" th:text="${draft.summary}">Routine summary</p>
+      </div>
+    </div>
+    <form
+      id="routine-draft-form"
+      method="post"
+      action="/routine-builder/refine"
+      data-routine-draft
+      data-ai-progress-form
+    >
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <input type="hidden" name="sessionMinutes" th:value="${draft.sessionMinutes ?: 60}" />
+      <input type="hidden" name="equipmentPreference" th:value="${draft.equipmentPreference ?: ''}" />
+      <label class="routine-draft-name">
+        Routine name
+        <input name="name" maxlength="160" required th:value="${draft.name}" />
+      </label>
+      <input type="hidden" name="summary" th:value="${draft.summary}" />
+      <div class="routine-draft-days" data-routine-days>
+        <article class="routine-draft-day" data-routine-day th:each="day,dayStat:${draft.days}">
+          <div class="routine-draft-day-heading">
+            <label>
+              Day name
+              <input th:name="'days[' + ${dayStat.index} + '].name'" maxlength="120" required th:value="${day.name}" />
+            </label>
+            <button class="button danger-strong small" type="button" data-remove-day>Remove day</button>
+          </div>
+          <div class="routine-draft-exercises" data-routine-exercises>
+            <div
+              class="routine-draft-exercise"
+              data-routine-exercise
+              th:each="exercise,exerciseStat:${day.exercises}"
+              th:with="detail=${exerciseDetails[exercise.exerciseId]}"
+            >
+              <label class="routine-draft-exercise-name">
+                Exercise
+                <div class="exercise-picker" data-exercise-picker>
+                  <input
+                    type="search"
+                    class="exercise-picker-search"
+                    th:name="'days[' + ${dayStat.index} + '].exercises[' + ${exerciseStat.index} + '].exerciseName'"
+                    th:value="${exercise.exerciseName}"
+                    placeholder="Search exercises…"
+                    autocomplete="off"
+                    aria-expanded="false"
+                    required
+                  />
+                  <input type="hidden" name="exerciseId" th:value="${exercise.exerciseId}" />
+                  <div class="exercise-picker-results" role="listbox" hidden>
+                    <div class="exercise-picker-message">Type at least 2 characters to search.</div>
+                  </div>
+                </div>
+              </label>
+              <label>
+                Sets
+                <input
+                  type="number"
+                  min="1"
+                  max="20"
+                  required
+                  th:name="'days[' + ${dayStat.index} + '].exercises[' + ${exerciseStat.index} + '].sets'"
+                  th:value="${exercise.sets}"
+                />
+              </label>
+              <label>
+                Min reps
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  required
+                  th:name="'days[' + ${dayStat.index} + '].exercises[' + ${exerciseStat.index} + '].minReps'"
+                  th:value="${exercise.minReps}"
+                />
+              </label>
+              <label>
+                Max reps
+                <input
+                  type="number"
+                  min="1"
+                  max="1000"
+                  required
+                  th:name="'days[' + ${dayStat.index} + '].exercises[' + ${exerciseStat.index} + '].maxReps'"
+                  th:value="${exercise.maxReps}"
+                />
+              </label>
+              <label>
+                Rest sec
+                <input
+                  type="number"
+                  min="0"
+                  max="900"
+                  required
+                  th:name="'days[' + ${dayStat.index} + '].exercises[' + ${exerciseStat.index} + '].restSeconds'"
+                  th:value="${exercise.restSeconds}"
+                />
+              </label>
+              <button class="button danger-strong small" type="button" data-remove-exercise>Remove</button>
+              <details class="exercise-instructions routine-draft-exercise-details" data-exercise-details>
+                <summary>Exercise details and image</summary>
+                <div class="instruction-box">
+                  <img
+                    data-exercise-image
+                    th:src="${detail != null && detail.source_id != null} ? @{/exercise-images/{id}/{i}(id=${detail.source_id},i=0)} : ''"
+                    th:hidden="${detail == null || detail.source_id == null}"
+                    alt="Exercise demonstration"
+                    onerror="this.style.display = 'none'"
+                  />
+                  <div>
+                    <div class="chips">
+                      <span data-exercise-muscles th:text="${detail?.primary_muscles ?: 'Muscles not listed'}">
+                        Muscles
+                      </span>
+                      <span data-exercise-equipment th:text="${detail?.equipment ?: 'Equipment not listed'}">
+                        Equipment
+                      </span>
+                    </div>
+                    <span class="eyebrow">FORM NOTES</span>
+                    <p
+                      data-exercise-instructions
+                      th:text="${detail?.instructions ?: 'No instructions are available for this exercise.'}"
+                    >
+                      Exercise instructions
+                    </p>
+                  </div>
+                </div>
+              </details>
+            </div>
+          </div>
+          <button class="button secondary small" type="button" data-add-exercise>＋ Add exercise</button>
+        </article>
+      </div>
+      <button class="button secondary" type="button" data-add-day>＋ Add day</button>
+      <label class="routine-refine-request">
+        Ask the assistant for a change
+        <textarea
+          name="changeRequest"
+          maxlength="2000"
+          placeholder="For example: replace barbell movements with dumbbell alternatives"
+        ></textarea>
+      </label>
+      <div class="routine-draft-actions">
+        <button
+          class="button secondary"
+          type="submit"
+          formaction="/routine-builder/refine"
+          data-ai-submit
+          th:disabled="${!aiEnabled}"
+        >
+          <span data-ai-idle-label>Update with AI</span>
+          <span data-ai-pending-label hidden>Updating draft…</span>
+        </button>
+        <button class="button primary" type="submit" formaction="/routine-builder/save">Save routine</button>
+      </div>
+      <p class="routine-ai-progress" data-ai-progress role="status" aria-live="polite" hidden>
+        <span class="routine-ai-spinner" aria-hidden="true"></span>
+        <span>Updating your draft. Keep this page open while the AI works.</span>
+      </p>
+    </form>
+    <form method="post" action="/routine-builder/cancel" class="routine-draft-cancel">
+      <input type="hidden" th:name="${_csrf.parameterName}" th:value="${_csrf.token}" />
+      <button class="link-button">Discard this draft</button>
+    </form>
+  </section>
+  <template id="routine-builder-exercise-template">
+    <div class="routine-draft-exercise" data-routine-exercise>
+      <label class="routine-draft-exercise-name">
+        Exercise
+        <div class="exercise-picker" data-exercise-picker>
+          <input
+            type="search"
+            class="exercise-picker-search"
+            placeholder="Search exercises…"
+            autocomplete="off"
+            aria-expanded="false"
+            required
+          />
+          <input type="hidden" name="exerciseId" />
+          <div class="exercise-picker-results" role="listbox" hidden>
+            <div class="exercise-picker-message">Type at least 2 characters to search.</div>
+          </div>
+        </div>
+      </label>
+      <label>
+        Sets
+        <input type="number" min="1" max="20" value="3" required />
+      </label>
+      <label>
+        Min reps
+        <input type="number" min="1" max="1000" value="8" required />
+      </label>
+      <label>
+        Max reps
+        <input type="number" min="1" max="1000" value="12" required />
+      </label>
+      <label>
+        Rest sec
+        <input type="number" min="0" max="900" value="90" required />
+      </label>
+      <button class="button danger-strong small" type="button" data-remove-exercise>Remove</button>
+      <details class="exercise-instructions routine-draft-exercise-details" data-exercise-details>
+        <summary>Exercise details and image</summary>
+        <div class="instruction-box">
+          <img data-exercise-image hidden alt="Exercise demonstration" onerror="this.style.display = 'none'" />
+          <div>
+            <div class="chips">
+              <span data-exercise-muscles>Muscles not listed</span>
+              <span data-exercise-equipment>Equipment not listed</span>
+            </div>
+            <span class="eyebrow">FORM NOTES</span>
+            <p data-exercise-instructions>No instructions are available for this exercise.</p>
+          </div>
+        </div>
+      </details>
+    </div>
+  </template>
+  <template id="routine-builder-day-template">
+    <article class="routine-draft-day" data-routine-day>
+      <div class="routine-draft-day-heading">
+        <label>
+          Day name
+          <input maxlength="120" required />
+        </label>
+        <button class="button danger-strong small" type="button" data-remove-day>Remove day</button>
+      </div>
+      <div class="routine-draft-exercises" data-routine-exercises></div>
+      <button class="button secondary small" type="button" data-add-exercise>＋ Add exercise</button>
+    </article>
+  </template>
+</main>

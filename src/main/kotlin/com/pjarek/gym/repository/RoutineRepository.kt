@@ -38,12 +38,14 @@ class RoutineRepository(private val jdbc: NamedParameterJdbcTemplate) {
         mapOf("id" to id), rows
     )
 
-    fun addDay(id: UUID, name: String) {
+    fun addDay(id: UUID, name: String): UUID {
         val position = jdbc.queryForObject(
             "SELECT coalesce(max(position),0)+1 FROM routine_day WHERE routine_id=:id", mapOf("id" to id), Int::class.java
         )!!
-        jdbc.update("INSERT INTO routine_day(routine_id,name,position) VALUES (:id,:name,:position)",
-            mapOf("id" to id, "name" to name, "position" to position))
+        return jdbc.queryForObject(
+            "INSERT INTO routine_day(routine_id,name,position) VALUES (:id,:name,:position) RETURNING id",
+            mapOf("id" to id, "name" to name, "position" to position), UUID::class.java
+        )!!
     }
 
     fun renameDay(id: UUID, dayId: UUID, name: String) {

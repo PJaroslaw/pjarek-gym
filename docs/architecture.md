@@ -12,14 +12,15 @@ Templates live in `src/main/resources/templates`. Page templates compose fragmen
 
 ## Main components
 
-| Area                  | Code                                                                                                                                | Responsibility                                                                      |
-| --------------------- | ----------------------------------------------------------------------------------------------------------------------------------- | ----------------------------------------------------------------------------------- |
-| Accounts and access   | `SecurityConfig`, `UserAccess`, `AccountController`, `AdminController`, `AccountService`, `AccountRepository`                       | Form login, user preferences, password changes, and admin account actions           |
-| Routines and workouts | `RoutineController`, `WorkoutController`, `DashboardController`, their services and repositories                                    | Plans, training sessions, set logging, timers, overview, and history                |
-| Exercise catalog      | `ExerciseLibraryController`, `ExerciseSearchService`, `ExerciseRepository`, `ExerciseCatalogImporter`, `ExerciseDatasetSyncService` | Catalog search, catalog import, and local image synchronization                     |
-| Admin inspection      | `AdminUserInspectionController`, `AdminInspectionService`, `AdminInspectionRepository`                                              | Read-only, paginated inspection of an account's routines and workouts               |
-| Views and assets      | `templates/`, `static/assets/`                                                                                                      | Server-rendered pages, partial updates, styling, and small client-side interactions |
-| Database              | `db/migration/`                                                                                                                     | Versioned PostgreSQL schema managed by Flyway                                       |
+| Area                  | Code                                                                                                                                     | Responsibility                                                                                                     |
+| --------------------- | ---------------------------------------------------------------------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------ |
+| Accounts and access   | `SecurityConfig`, `UserAccess`, `AccountController`, `AdminController`, `AccountService`, `AccountRepository`                            | Form login, user preferences, password changes, and admin account actions                                          |
+| Routines and workouts | `RoutineController`, `RoutineBuilderController`, `RoutineDraftGenerator`, `WorkoutController`, `DashboardController`, their repositories | Draft generation and import, editable routine plans, training sessions, set logging, timers, overview, and history |
+| AI providers          | `OpenAiResponsesRoutineDraftGenerator`, `OllamaRoutineDraftGenerator`, `RoutineSourceFileProcessor`                                      | Provider-specific structured generation and local PDF extraction/rendering                                         |
+| Exercise catalog      | `ExerciseLibraryController`, `ExerciseSearchService`, `ExerciseRepository`, `ExerciseCatalogImporter`, `ExerciseDatasetSyncService`      | Catalog search, catalog import, and local image synchronization                                                    |
+| Admin inspection      | `AdminUserInspectionController`, `AdminInspectionService`, `AdminInspectionRepository`                                                   | Read-only, paginated inspection of an account's routines and workouts                                              |
+| Views and assets      | `templates/`, `static/assets/`                                                                                                           | Server-rendered pages, partial updates, styling, and small client-side interactions                                |
+| Database              | `db/migration/`                                                                                                                          | Versioned PostgreSQL schema managed by Flyway                                                                      |
 
 ## Authentication and authorization
 
