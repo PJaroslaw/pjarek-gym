@@ -79,7 +79,7 @@ class RoutineBuilderController(
             val revised = routineBuilderService.refine(draft, changeRequest)
             session.setAttribute(DRAFT_SESSION_KEY, RoutineDraftSession(owner, revised))
             if (draft.name == revised.name && draft.days == revised.days) {
-                model.addAttribute("builderNotice", "The AI returned the routine unchanged. Try asking for one specific change, such as replacing a named exercise.")
+                model.addAttribute("builderWarning", "The AI returned the routine unchanged. Try asking for one specific change, such as replacing a named exercise.")
             } else {
                 model.addAttribute("builderNotice", "Draft updated. Review the changes below before saving.")
             }

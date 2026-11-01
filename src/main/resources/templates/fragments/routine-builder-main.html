@@ -9,7 +9,14 @@
   </div>
   <div class="content-error" role="alert" th:if="${builderError}" th:text="${builderError}"></div>
   <div
-    class="routine-builder-feedback"
+    class="routine-builder-feedback routine-builder-feedback--warning"
+    role="alert"
+    aria-live="assertive"
+    th:if="${builderWarning}"
+    th:text="${builderWarning}"
+  ></div>
+  <div
+    class="routine-builder-feedback routine-builder-feedback--success"
     role="status"
     aria-live="polite"
     th:if="${builderNotice}"
