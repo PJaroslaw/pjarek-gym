@@ -1,0 +1,536 @@
+package com.pjarek.gym.integration
+
+import java.math.BigDecimal
+import java.sql.Timestamp
+import java.time.LocalDate
+import java.time.ZoneId
+import java.util.UUID
+import org.hamcrest.Matchers.containsString
+import org.junit.jupiter.api.Assertions.assertEquals
+import org.junit.jupiter.api.Assertions.assertFalse
+import org.junit.jupiter.api.Assertions.assertTrue
+import org.junit.jupiter.api.Test
+import org.junit.jupiter.params.ParameterizedTest
+import org.junit.jupiter.params.provider.ValueSource
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf
+import org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.user
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get
+import org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.content
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirectedUrl
+import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
+
+class WorkoutIntegrationTest : IntegrationTestSupport() {
+    @Test
+    fun `overview and history calendars show only the selected completion day`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val otherId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='integration-admin'", UUID::class.java)!!
+        val selectedDay = LocalDate.of(2026, 4, 14)
+        val completedAt = Timestamp.from(selectedDay.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant())
+        val nextDay = Timestamp.from(selectedDay.plusDays(1).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant())
+        val selectedId = jdbc.queryForObject(
+            "INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Selected session','COMPLETED',?,NULL) RETURNING id",
+            UUID::class.java, ownerId, completedAt
+        )!!
+        jdbc.update("INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Second selected session','COMPLETED',?,NULL)", ownerId, completedAt)
+        jdbc.update("INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Another day','COMPLETED',?,NULL)", ownerId, nextDay)
+        jdbc.update("INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Other user session','COMPLETED',?,NULL)", otherId, completedAt)
+
+        val overview = mockMvc.perform(get("/").param("day", "2026-04-14")
+            .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
+        val overviewSessions = overview.substringAfter("class=\"calendar-session-heading\"").substringBefore("class=\"volume-chart\"")
+        assertTrue(overview.contains("aria-label=\"2026-04-14, sessions: 2\""))
+        assertTrue(overview.contains("href=\"/?day=2026-04-14\""))
+        assertTrue(overviewSessions.contains("Selected session"))
+        assertTrue(overviewSessions.contains("Second selected session"))
+        assertFalse(overviewSessions.contains("Another day"))
+        assertFalse(overviewSessions.contains("Other user session"))
+        assertFalse(overviewSessions.contains("Delete"))
+
+        val history = mockMvc.perform(get("/history").param("day", "2026-04-14")
+            .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
+        assertTrue(history.contains("April 2026"))
+        assertTrue(history.contains("href=\"/history?day=2026-04-14\""))
+        assertTrue(history.contains("href=\"/workouts/$selectedId\""))
+        assertTrue(history.contains("Selected session"))
+        assertTrue(history.contains("Second selected session"))
+        assertFalse(history.contains("Another day"))
+        assertFalse(history.contains("Other user session"))
+        assertTrue(history.contains("returnTo=history"))
+
+        val emptyDay = mockMvc.perform(get("/history").param("day", "2026-04-16")
+            .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
+        assertTrue(emptyDay.contains("No completed workouts on this day."))
+        assertFalse(emptyDay.contains("Selected session"))
+
+        mockMvc.perform(post("/workouts/$selectedId/delete").param("returnTo", "history")
+            .param("day", "2026-04-14").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andExpect(redirectedUrl("/history?day=2026-04-14"))
+    }
+
+    @Test
+    fun `calendar month navigation and invalid dates do not expose session lists`() {
+        val page = mockMvc.perform(get("/history").param("month", "2026-04")
+            .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
+        assertTrue(page.contains("href=\"/history?month=2026-03\""))
+        assertTrue(page.contains("href=\"/history?month=2026-05\""))
+        assertTrue(page.contains("Jump to month"))
+        assertTrue(page.contains("type=\"month\""))
+        assertTrue(page.contains("Select a date to see its sessions."))
+
+        mockMvc.perform(get("/history").param("month", "2026-04").param("day", "2026-04-14")
+            .with(user("exercise-search-test"))).andExpect(status().is3xxRedirection)
+        mockMvc.perform(get("/history").param("month", "invalid")
+            .with(user("exercise-search-test"))).andExpect(status().is3xxRedirection)
+    }
+
+    @Test
+    fun `starting quick workout from exercise detail includes and opens that exercise`() {
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
+        val redirect = mockMvc.perform(post("/workouts/ad-hoc").param("exerciseId", exerciseId.toString())
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andReturn().response.redirectedUrl!!
+        val workoutId = UUID.fromString(redirect.substringAfter("/workouts/").substringBefore('?'))
+        val itemId = jdbc.queryForObject("SELECT id FROM workout_exercise WHERE workout_id=?", UUID::class.java, workoutId)!!
+
+        assertEquals("/workouts/$workoutId?exercise=$itemId", redirect)
+        assertEquals(exerciseId, jdbc.queryForObject("SELECT exercise_id FROM workout_exercise WHERE id=?", Long::class.java, itemId))
+        mockMvc.perform(get(redirect).with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("Incline Dumbbell Press")))
+            .andExpect(content().string(containsString("EXERCISE 1 OF 1")))
+    }
+
+    @Test
+    fun `quick workout and add exercise reject unknown exercise ids without creating orphan records`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val workoutCount = jdbc.queryForObject("SELECT count(*) FROM workout WHERE owner_id=?", Int::class.java, ownerId)
+        mockMvc.perform(post("/workouts/ad-hoc").param("exerciseId", "-1")
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        assertEquals(workoutCount, jdbc.queryForObject("SELECT count(*) FROM workout WHERE owner_id=?", Int::class.java, ownerId))
+
+        val workoutId = jdbc.queryForObject("INSERT INTO workout(owner_id,title) VALUES (?,'Invalid exercise') RETURNING id", UUID::class.java, ownerId)!!
+        mockMvc.perform(post("/workouts/$workoutId/exercises").param("exerciseId", "-1")
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM workout_exercise WHERE workout_id=?", Int::class.java, workoutId))
+    }
+
+    @Test
+    fun `overview recent sessions link to summaries without showing delete controls`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val completedId = jdbc.queryForObject(
+            "INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Overview completed','COMPLETED',now(),NULL) RETURNING id",
+            UUID::class.java,
+            ownerId
+        )!!
+        jdbc.queryForObject(
+            "INSERT INTO workout(owner_id,title,status) VALUES (?,'Overview active','IN_PROGRESS') RETURNING id",
+            UUID::class.java,
+            ownerId
+        )!!
+
+        val page = mockMvc.perform(get("/").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andReturn().response.contentAsString
+        assertPostFormsHaveOneCsrfToken(page)
+        val recent = page.substringAfter("<section class=\"panel recent\">").substringBefore("</section>")
+
+        assertTrue(recent.contains("/workouts/$completedId"))
+        assertFalse(recent.contains("Delete"))
+        assertTrue(page.contains("Overview active"))
+        assertTrue(page.contains("Delete"))
+    }
+
+    @Test
+    fun `dashboard routines expand to planned days and start the selected day`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val routineId = jdbc.queryForObject(
+            "INSERT INTO routine(owner_id,name) VALUES (?, 'Dashboard plan') RETURNING id",
+            UUID::class.java,
+            ownerId
+        )!!
+        val dayId = jdbc.queryForObject(
+            "INSERT INTO routine_day(routine_id,name,position) VALUES (?, 'Upper body', 1) RETURNING id",
+            UUID::class.java,
+            routineId
+        )!!
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
+        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position) VALUES (?,?,1)", dayId, exerciseId)
+
+        val page = mockMvc.perform(get("/").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andReturn().response.contentAsString
+
+        assertTrue(page.contains("Dashboard plan"))
+        assertTrue(page.contains("Upper body"))
+        assertTrue(page.contains("Planned exercises: 1"))
+        assertTrue(page.contains("/routines/$routineId/days/$dayId/start"))
+        assertPostFormsHaveOneCsrfToken(page)
+
+        val redirect = mockMvc.perform(post("/routines/$routineId/days/$dayId/start")
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andReturn().response.redirectedUrl!!
+        val workoutId = UUID.fromString(redirect.substringAfterLast('/'))
+
+        assertEquals("Upper body", jdbc.queryForObject("SELECT title FROM workout WHERE id=?", String::class.java, workoutId))
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM workout_exercise WHERE workout_id=?", Int::class.java, workoutId))
+    }
+
+    @Test
+    fun `history shows and deletes completed sessions and show page summarizes every exercise read only`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val workoutId = jdbc.queryForObject(
+            "INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Full summary','COMPLETED',now(),NULL) RETURNING id",
+            UUID::class.java,
+            ownerId
+        )!!
+        val exercises = jdbc.query(
+            "SELECT id,name FROM exercise WHERE name IN ('Barbell Deadlift','Alternate Heel Touchers') ORDER BY name",
+            { rs, _ -> rs.getLong("id") to rs.getString("name") }
+        )
+        val firstItem = jdbc.queryForObject(
+            "INSERT INTO workout_exercise(workout_id,exercise_id,position,planned_sets,min_reps,max_reps) VALUES (?,?,1,2,6,8) RETURNING id",
+            UUID::class.java,
+            workoutId,
+            exercises[0].first
+        )!!
+        val secondItem = jdbc.queryForObject(
+            "INSERT INTO workout_exercise(workout_id,exercise_id,position,planned_sets,min_reps,max_reps) VALUES (?,?,2,1,10,12) RETURNING id",
+            UUID::class.java,
+            workoutId,
+            exercises[1].first
+        )!!
+        jdbc.update("INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight) VALUES (?,1,8,20)", firstItem)
+        jdbc.update("INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight) VALUES (?,2,7,21)", firstItem)
+        jdbc.update("INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight) VALUES (?,1,12,10)", secondItem)
+
+        val historyPage = mockMvc.perform(get("/history").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("class=\"history-session-actions\"")))
+            .andExpect(content().string(containsString(">Show</a>")))
+            .andExpect(content().string(containsString("returnTo=history")))
+            .andReturn().response.contentAsString
+        assertPostFormsHaveOneCsrfToken(historyPage)
+        assertTrue(historyPage.contains("href=\"/workouts/$workoutId\""))
+        assertFalse(historyPage.contains("kg volume"))
+
+        val showPage = mockMvc.perform(get("/workouts/$workoutId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("Review all exercises and sets from this session.")))
+            .andExpect(content().string(containsString("Completed ")))
+            .andExpect(content().string(containsString(exercises[0].second)))
+            .andExpect(content().string(containsString(exercises[1].second)))
+            .andExpect(content().string(containsString("21.00 KG")))
+            .andExpect(content().string(containsString("10.00 KG")))
+            .andExpect(content().string(containsString("427 kg volume")))
+            .andExpect(content().string(containsString("Delete workout")))
+            .andReturn().response.contentAsString
+        assertFalse(showPage.contains("workout-step-nav"))
+        assertFalse(showPage.contains("Save set"))
+        assertFalse(showPage.contains("Log set"))
+        assertFalse(showPage.contains("Add an exercise"))
+
+        mockMvc.perform(post("/workouts/$workoutId/delete").param("returnTo", "history")
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andExpect(redirectedUrl("/history"))
+    }
+
+    @Test
+    fun `starting a routine day creates a uuid workout and advances one exercise at a time`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val routineId = jdbc.queryForObject("INSERT INTO routine(owner_id,name) VALUES (?, 'Push') RETURNING id", UUID::class.java, ownerId)!!
+        val dayId = jdbc.queryForObject("INSERT INTO routine_day(routine_id,name,position) VALUES (?, 'Day 1',1) RETURNING id", UUID::class.java, routineId)!!
+        val firstExercise = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
+        val secondExercise = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Dumbbell Bench Press'", Long::class.java)!!
+        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,planned_sets,min_reps,max_reps) VALUES (?,?,1,1,6,8)", dayId, firstExercise)
+        jdbc.update("INSERT INTO routine_item(day_id,exercise_id,position,planned_sets,min_reps,max_reps) VALUES (?,?,2,1,8,12)", dayId, secondExercise)
+
+        val start = mockMvc.perform(post("/routines/$routineId/days/$dayId/start").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andReturn().response.redirectedUrl!!
+        val workoutId = UUID.fromString(start.substringAfterLast('/'))
+        assertEquals(2, jdbc.queryForObject("SELECT count(*) FROM workout_exercise WHERE workout_id=?", Int::class.java, workoutId))
+
+        val firstStep = mockMvc.perform(get("/workouts/$workoutId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("EXERCISE 1 OF 2")))
+            .andExpect(content().string(containsString("Incline Dumbbell Press")))
+            .andExpect(content().string(containsString("name=\"reps\"")))
+            .andExpect(content().string(containsString("inputmode=\"numeric\"")))
+            .andExpect(content().string(containsString("value=\"8\"")))
+            .andExpect(content().string(containsString("Plan: 1 sets · 6–8 reps")))
+            .andReturn().response.contentAsString
+        assertPostFormsHaveOneCsrfToken(firstStep)
+        assertTrue(firstStep.contains("FORM NOTES"))
+        val firstItemId = jdbc.queryForObject("SELECT id FROM workout_exercise WHERE workout_id=? AND position=1", UUID::class.java, workoutId)!!
+        assertEquals(6, jdbc.queryForObject("SELECT min_reps FROM workout_exercise WHERE id=?", Int::class.java, firstItemId))
+        assertEquals(8, jdbc.queryForObject("SELECT max_reps FROM workout_exercise WHERE id=?", Int::class.java, firstItemId))
+        mockMvc.perform(post("/workouts/$workoutId/sets").param("itemId", firstItemId.toString()).param("reps", "8").param("weight", "20")
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+
+        mockMvc.perform(get("/workouts/$workoutId?exercise=$firstItemId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("value=\"20.00\"")))
+
+        mockMvc.perform(get("/workouts/$workoutId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("EXERCISE 2 OF 2")))
+            .andExpect(content().string(containsString("Dumbbell Bench Press")))
+        mockMvc.perform(post("/workouts/$workoutId/finish").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andExpect(redirectedUrl("/"))
+        assertEquals("COMPLETED", jdbc.queryForObject("SELECT status FROM workout WHERE id=?", String::class.java, workoutId))
+    }
+
+    @Test
+    fun `workout page shows the previous completed session for that exercise`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
+        val previousId = jdbc.queryForObject("INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Previous','COMPLETED',now(),NULL) RETURNING id", UUID::class.java, ownerId)!!
+        val previousItem = jdbc.queryForObject("INSERT INTO workout_exercise(workout_id,exercise_id,position) VALUES (?,?,1) RETURNING id", UUID::class.java, previousId, exerciseId)!!
+        jdbc.update("INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight) VALUES (?,1,10,32.5)", previousItem)
+        val currentId = jdbc.queryForObject("INSERT INTO workout(owner_id,title) VALUES (?,'Current') RETURNING id", UUID::class.java, ownerId)!!
+        jdbc.update("INSERT INTO workout_exercise(workout_id,exercise_id,position,planned_sets,min_reps,max_reps) VALUES (?,?,1,3,8,12)", currentId, exerciseId)
+
+        jdbc.update("UPDATE app_user SET weight_unit='LB' WHERE id=?", ownerId)
+        assertEquals(BigDecimal("32.50"), jdbc.queryForObject("SELECT weight FROM workout_set WHERE workout_exercise_id=?", BigDecimal::class.java, previousItem))
+
+        mockMvc.perform(get("/workouts/$currentId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("PREVIOUS SESSION")))
+            .andExpect(content().string(containsString("71.75 LB")))
+            .andExpect(content().string(containsString("value=\"12\"")))
+            .andExpect(content().string(containsString("value=\"71.75\"")))
+    }
+
+    @Test
+    fun `history shows personal best weights in the selected unit without mixed unit duplicates`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
+        listOf(BigDecimal("45.36"), BigDecimal("90.72")).forEachIndexed { index, weight ->
+            val workoutId = jdbc.queryForObject(
+                "INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,?,'COMPLETED',now(),NULL) RETURNING id",
+                UUID::class.java,
+                ownerId,
+                "History $index"
+            )!!
+            val itemId = jdbc.queryForObject(
+                "INSERT INTO workout_exercise(workout_id,exercise_id,position) VALUES (?,?,1) RETURNING id",
+                UUID::class.java,
+                workoutId,
+                exerciseId
+            )!!
+            jdbc.update("INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight) VALUES (?,1,8,?)", itemId, weight)
+        }
+        jdbc.update("UPDATE app_user SET weight_unit='LB' WHERE id=?", ownerId)
+
+        val page = mockMvc.perform(get("/history").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("200.00 LB")))
+            .andReturn().response.contentAsString
+        assertEquals(1, Regex("Incline Dumbbell Press").findAll(page).count())
+    }
+
+    @Test
+    fun `workout defaults weight to zero without history and last set weight on the next workout`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
+        val firstWorkout = jdbc.queryForObject("INSERT INTO workout(owner_id,title) VALUES (?,'First') RETURNING id", UUID::class.java, ownerId)!!
+        val firstItem = jdbc.queryForObject("INSERT INTO workout_exercise(workout_id,exercise_id,position,planned_sets,min_reps,max_reps) VALUES (?,?,1,2,5,9) RETURNING id", UUID::class.java, firstWorkout, exerciseId)!!
+
+        mockMvc.perform(get("/workouts/$firstWorkout").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("value=\"9\"")))
+            .andExpect(content().string(containsString("value=\"0\"")))
+        mockMvc.perform(post("/workouts/$firstWorkout/sets").param("itemId", firstItem.toString()).param("reps", "9").param("weight", "47.5")
+            .with(user("exercise-search-test")).with(csrf())).andExpect(status().is3xxRedirection)
+        mockMvc.perform(post("/workouts/$firstWorkout/finish").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+
+        val nextWorkout = jdbc.queryForObject("INSERT INTO workout(owner_id,title) VALUES (?,'Next') RETURNING id", UUID::class.java, ownerId)!!
+        jdbc.update("INSERT INTO workout_exercise(workout_id,exercise_id,position,planned_sets,min_reps,max_reps) VALUES (?,?,1,2,5,9)", nextWorkout, exerciseId)
+        mockMvc.perform(get("/workouts/$nextWorkout").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("value=\"9\"")))
+            .andExpect(content().string(containsString("value=\"47.50\"")))
+    }
+
+    @Test
+    fun `workout timer excludes paused time and saves its duration when finished`() {
+        val redirect = mockMvc.perform(post("/workouts/ad-hoc").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andReturn().response.redirectedUrl!!
+        val workoutId = UUID.fromString(redirect.substringAfterLast('/'))
+        jdbc.update("UPDATE workout SET active_since=now()-interval '125 seconds' WHERE id=?", workoutId)
+
+        mockMvc.perform(get("/workouts/$workoutId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("WORKOUT TIME")))
+            .andExpect(content().string(containsString("data-workout-id=\"$workoutId\"")))
+            .andExpect(content().string(containsString("Pause workout")))
+        mockMvc.perform(post("/workouts/$workoutId/pause").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        val pausedElapsed = jdbc.queryForObject("SELECT elapsed_seconds FROM workout WHERE id=?", Int::class.java, workoutId)!!
+        assertTrue(pausedElapsed in 124..126)
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM workout WHERE id=? AND status='PAUSED' AND active_since IS NULL", Int::class.java, workoutId))
+        mockMvc.perform(get("/workouts/$workoutId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("Resume workout")))
+
+        mockMvc.perform(post("/workouts/$workoutId/resume").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        jdbc.update("UPDATE workout SET active_since=now()-interval '37 seconds' WHERE id=?", workoutId)
+        mockMvc.perform(post("/workouts/$workoutId/finish").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        val savedDuration = jdbc.queryForObject("SELECT elapsed_seconds FROM workout WHERE id=?", Int::class.java, workoutId)!!
+        assertTrue(savedDuration in (pausedElapsed + 36)..(pausedElapsed + 38))
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM workout WHERE id=? AND status='COMPLETED' AND active_since IS NULL", Int::class.java, workoutId))
+        mockMvc.perform(get("/workouts/$workoutId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("TOTAL WORKOUT TIME")))
+            .andExpect(content().string(containsString("data-elapsed-seconds=\"$savedDuration\"")))
+        mockMvc.perform(get("/history").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("${savedDuration / 60}m")))
+    }
+
+    @Test
+    fun `last exercise page exposes the finish action in its bottom controls`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val workoutId = jdbc.queryForObject("INSERT INTO workout(owner_id,title) VALUES (?,'Final set') RETURNING id", UUID::class.java, ownerId)!!
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
+        jdbc.update("INSERT INTO workout_exercise(workout_id,exercise_id,position,planned_sets) VALUES (?,?,1,1)", workoutId, exerciseId)
+        val page = mockMvc.perform(get("/workouts/$workoutId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("Finish workout ✓")))
+            .andExpect(content().string(containsString("class=\"workout-timers\"")))
+            .andExpect(content().string(containsString("class=\"button danger-strong\">Delete workout")))
+            .andReturn().response.contentAsString
+        val navigation = Regex("<nav class=\"workout-step-nav\".*?</nav>", RegexOption.DOT_MATCHES_ALL)
+            .find(page)?.value.orEmpty()
+        assertTrue(navigation.contains("Finish workout ✓"))
+        assertFalse(navigation.contains("Next exercise →"))
+        assertTrue(page.indexOf("workout-danger-zone") > page.indexOf("Add an exercise"))
+    }
+
+    @ParameterizedTest
+    @ValueSource(strings = ["IN_PROGRESS", "COMPLETED"])
+    fun `owner can delete active and completed workouts and dependent records`(workoutStatus: String) {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val workoutId = jdbc.queryForObject(
+            "INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,?,?,CASE WHEN ?='COMPLETED' THEN now() ELSE NULL END,CASE WHEN ?='COMPLETED' THEN NULL ELSE now() END) RETURNING id",
+            UUID::class.java, ownerId, "Delete $workoutStatus", workoutStatus, workoutStatus, workoutStatus
+        )!!
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise LIMIT 1", Long::class.java)!!
+        val itemId = jdbc.queryForObject("INSERT INTO workout_exercise(workout_id,exercise_id,position) VALUES (?,?,1) RETURNING id", UUID::class.java, workoutId, exerciseId)!!
+        jdbc.update("INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight) VALUES (?,1,8,10)", itemId)
+        jdbc.update("INSERT INTO workout_event(workout_id,kind) VALUES (?,'PAUSED')", workoutId)
+        val destination = if (workoutStatus == "COMPLETED") "history" else "overview"
+        val redirect = if (destination == "history") "/history" else "/"
+
+        mockMvc.perform(post("/workouts/$workoutId/delete").param("returnTo", destination)
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andExpect(redirectedUrl(redirect))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM workout WHERE id=?", Int::class.java, workoutId))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM workout_exercise WHERE workout_id=?", Int::class.java, workoutId))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM workout_set WHERE workout_exercise_id=?", Int::class.java, itemId))
+        assertEquals(0, jdbc.queryForObject("SELECT count(*) FROM workout_event WHERE workout_id=?", Int::class.java, workoutId))
+    }
+
+    @Test
+    fun `workout delete rejects another users workout and unknown destinations`() {
+        val adminId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='integration-admin'", UUID::class.java)!!
+        val foreignWorkout = jdbc.queryForObject("INSERT INTO workout(owner_id,title) VALUES (?,'Private') RETURNING id", UUID::class.java, adminId)!!
+        mockMvc.perform(post("/workouts/$foreignWorkout/delete").param("returnTo", "overview")
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().isForbidden)
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM workout WHERE id=?", Int::class.java, foreignWorkout))
+
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val ownedWorkout = jdbc.queryForObject("INSERT INTO workout(owner_id,title) VALUES (?,'Keep') RETURNING id", UUID::class.java, ownerId)!!
+        mockMvc.perform(post("/workouts/$ownedWorkout/delete").param("returnTo", "unknown")
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM workout WHERE id=?", Int::class.java, ownedWorkout))
+    }
+
+    @Test
+    fun `ad hoc workouts add exercises and pause and resume on the selected exercise`() {
+        val redirect = mockMvc.perform(post("/workouts/ad-hoc").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andReturn().response.redirectedUrl!!
+        val workoutId = UUID.fromString(redirect.substringAfterLast('/'))
+        val exerciseIds = jdbc.query("SELECT id FROM exercise WHERE name IN ('Incline Dumbbell Press','Dumbbell Bench Press') ORDER BY name", { rs, _ -> rs.getLong(1) })
+        exerciseIds.forEach { exerciseId ->
+            val redirect = mockMvc.perform(post("/workouts/$workoutId/exercises").param("exerciseId", exerciseId.toString())
+                .with(user("exercise-search-test")).with(csrf())).andExpect(status().is3xxRedirection)
+                .andReturn().response.redirectedUrl!!
+            val selectedItemId = jdbc.queryForObject(
+                "SELECT id FROM workout_exercise WHERE workout_id=? AND exercise_id=?",
+                UUID::class.java,
+                workoutId,
+                exerciseId
+            )!!
+            assertEquals("/workouts/$workoutId?exercise=$selectedItemId", redirect)
+        }
+        val itemIds = jdbc.query("SELECT id FROM workout_exercise WHERE workout_id=? ORDER BY position", { rs, _ -> rs.getObject(1, UUID::class.java) }, workoutId)
+        val selectedExercisePage = mockMvc.perform(get("/workouts/$workoutId?exercise=${itemIds.last()}").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("Show exercise notes and image")))
+            .andExpect(content().string(containsString("Incline Dumbbell Press")))
+            .andReturn().response.contentAsString
+        assertFalse(selectedExercisePage.contains("Move exercise earlier"))
+        assertFalse(selectedExercisePage.contains("Move exercise later"))
+        assertTrue(selectedExercisePage.contains("<details class=\"exercise-instructions\">"))
+        assertTrue(selectedExercisePage.contains("name=\"exercise\" value=\"${itemIds.last()}\""))
+
+        mockMvc.perform(post("/workouts/$workoutId/pause").param("exercise", itemIds.last().toString())
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andExpect(redirectedUrl("/workouts/$workoutId?exercise=${itemIds.last()}"))
+        assertEquals("PAUSED", jdbc.queryForObject("SELECT status FROM workout WHERE id=?", String::class.java, workoutId))
+        mockMvc.perform(post("/workouts/$workoutId/pause").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM workout_event WHERE workout_id=? AND kind='PAUSED'", Int::class.java, workoutId))
+        mockMvc.perform(get("/workouts/$workoutId?exercise=${itemIds.last()}").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("name=\"exercise\" value=\"${itemIds.last()}\"")))
+        mockMvc.perform(post("/workouts/$workoutId/resume").param("exercise", itemIds.last().toString())
+            .with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andExpect(redirectedUrl("/workouts/$workoutId?exercise=${itemIds.last()}"))
+        assertEquals("IN_PROGRESS", jdbc.queryForObject("SELECT status FROM workout WHERE id=?", String::class.java, workoutId))
+        mockMvc.perform(post("/workouts/$workoutId/resume").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+        assertEquals(1, jdbc.queryForObject("SELECT count(*) FROM workout_event WHERE workout_id=? AND kind='RESUMED'", Int::class.java, workoutId))
+    }
+
+    @Test
+    fun `completed planned sets are labeled as complete instead of showing an extra planned set`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!
+        val workoutId = jdbc.queryForObject("INSERT INTO workout(owner_id,title) VALUES (?,'Completed plan') RETURNING id", UUID::class.java, ownerId)!!
+        val itemId = jdbc.queryForObject(
+            "INSERT INTO workout_exercise(workout_id,exercise_id,position,planned_sets,min_reps,max_reps) VALUES (?,?,1,4,6,8) RETURNING id",
+            UUID::class.java,
+            workoutId,
+            exerciseId
+        )!!
+        repeat(4) { setNumber -> jdbc.update("INSERT INTO workout_set(workout_exercise_id,set_number,reps,weight) VALUES (?,?,8,20)", itemId, setNumber + 1) }
+
+        val page = mockMvc.perform(get("/workouts/$workoutId").with(user("exercise-search-test")))
+            .andExpect(status().isOk)
+            .andExpect(content().string(containsString("4 PLANNED SETS COMPLETE")))
+            .andExpect(content().string(containsString("Log extra set ＋")))
+            .andReturn().response.contentAsString
+        assertFalse(page.contains("SET 5 OF 4"))
+    }
+}
