@@ -2,8 +2,10 @@ package com.pjarek.gym
 
 import java.math.BigDecimal
 import java.time.Instant
+import java.time.LocalDate
 import java.util.UUID
 import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.format.annotation.DateTimeFormat
 import org.springframework.security.core.annotation.AuthenticationPrincipal
 import org.springframework.security.core.userdetails.UserDetails
 import org.springframework.stereotype.Controller
@@ -244,11 +246,12 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
     fun deleteWorkout(
         @PathVariable id: UUID,
         @RequestParam returnTo: String,
+        @RequestParam(required = false) @DateTimeFormat(iso = DateTimeFormat.ISO.DATE) day: LocalDate?,
         @AuthenticationPrincipal user: UserDetails
     ): String {
         val destination = when (returnTo) {
             "overview" -> "redirect:/"
-            "history" -> "redirect:/history"
+            "history" -> if (day == null) "redirect:/history" else "redirect:/history?day=$day"
             else -> throw IllegalArgumentException("Unknown workout deletion destination")
         }
         access.ownedWorkout(id, access.userId(user))

@@ -1,6 +1,9 @@
 package com.pjarek.gym
 
 import java.math.BigDecimal
+import java.sql.Timestamp
+import java.time.LocalDate
+import java.time.ZoneId
 import java.util.UUID
 import org.hamcrest.Matchers.containsString
 import org.junit.jupiter.api.Assertions.assertEquals
@@ -18,6 +21,70 @@ import org.springframework.test.web.servlet.result.MockMvcResultMatchers.redirec
 import org.springframework.test.web.servlet.result.MockMvcResultMatchers.status
 
 class WorkoutIntegrationTest : IntegrationTestSupport() {
+    @Test
+    fun `overview and history calendars show only the selected completion day`() {
+        val ownerId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='exercise-search-test'", UUID::class.java)!!
+        val otherId = jdbc.queryForObject("SELECT id FROM app_user WHERE username='integration-admin'", UUID::class.java)!!
+        val selectedDay = LocalDate.of(2026, 4, 14)
+        val completedAt = Timestamp.from(selectedDay.atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant())
+        val nextDay = Timestamp.from(selectedDay.plusDays(1).atTime(12, 0).atZone(ZoneId.systemDefault()).toInstant())
+        val selectedId = jdbc.queryForObject(
+            "INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Selected session','COMPLETED',?,NULL) RETURNING id",
+            UUID::class.java, ownerId, completedAt
+        )!!
+        jdbc.update("INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Second selected session','COMPLETED',?,NULL)", ownerId, completedAt)
+        jdbc.update("INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Another day','COMPLETED',?,NULL)", ownerId, nextDay)
+        jdbc.update("INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Other user session','COMPLETED',?,NULL)", otherId, completedAt)
+
+        val overview = mockMvc.perform(get("/").param("day", "2026-04-14")
+            .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
+        val overviewSessions = overview.substringAfter("class=\"calendar-session-heading\"").substringBefore("class=\"volume-chart\"")
+        assertTrue(overview.contains("aria-label=\"2026-04-14, sessions: 2\""))
+        assertTrue(overview.contains("href=\"/?day=2026-04-14\""))
+        assertTrue(overviewSessions.contains("Selected session"))
+        assertTrue(overviewSessions.contains("Second selected session"))
+        assertFalse(overviewSessions.contains("Another day"))
+        assertFalse(overviewSessions.contains("Other user session"))
+        assertFalse(overviewSessions.contains("Delete"))
+
+        val history = mockMvc.perform(get("/history").param("day", "2026-04-14")
+            .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
+        assertTrue(history.contains("April 2026"))
+        assertTrue(history.contains("href=\"/history?day=2026-04-14\""))
+        assertTrue(history.contains("href=\"/workouts/$selectedId\""))
+        assertTrue(history.contains("Selected session"))
+        assertTrue(history.contains("Second selected session"))
+        assertFalse(history.contains("Another day"))
+        assertFalse(history.contains("Other user session"))
+        assertTrue(history.contains("returnTo=history"))
+
+        val emptyDay = mockMvc.perform(get("/history").param("day", "2026-04-16")
+            .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
+        assertTrue(emptyDay.contains("No completed workouts on this day."))
+        assertFalse(emptyDay.contains("Selected session"))
+
+        mockMvc.perform(post("/workouts/$selectedId/delete").param("returnTo", "history")
+            .param("day", "2026-04-14").with(user("exercise-search-test")).with(csrf()))
+            .andExpect(status().is3xxRedirection)
+            .andExpect(redirectedUrl("/history?day=2026-04-14"))
+    }
+
+    @Test
+    fun `calendar month navigation and invalid dates do not expose session lists`() {
+        val page = mockMvc.perform(get("/history").param("month", "2026-04")
+            .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
+        assertTrue(page.contains("href=\"/history?month=2026-03\""))
+        assertTrue(page.contains("href=\"/history?month=2026-05\""))
+        assertTrue(page.contains("Jump to month"))
+        assertTrue(page.contains("type=\"month\""))
+        assertTrue(page.contains("Select a date to see its sessions."))
+
+        mockMvc.perform(get("/history").param("month", "2026-04").param("day", "2026-04-14")
+            .with(user("exercise-search-test"))).andExpect(status().is3xxRedirection)
+        mockMvc.perform(get("/history").param("month", "invalid")
+            .with(user("exercise-search-test"))).andExpect(status().is3xxRedirection)
+    }
+
     @Test
     fun `starting quick workout from exercise detail includes and opens that exercise`() {
         val exerciseId = jdbc.queryForObject("SELECT id FROM exercise WHERE name='Incline Dumbbell Press'", Long::class.java)!!

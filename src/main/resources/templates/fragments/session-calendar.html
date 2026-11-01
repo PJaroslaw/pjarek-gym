@@ -1,0 +1,60 @@
+<div xmlns:th="http://www.thymeleaf.org" th:fragment="calendar(basePath, calendar)" class="session-calendar">
+  <div class="calendar-navigation">
+    <a
+      class="calendar-nav"
+      th:if="${calendar.previousMonth != null}"
+      th:href="|${basePath}?month=${calendar.previousMonth}|"
+      aria-label="Previous month"
+    >
+      ←
+    </a>
+    <span class="calendar-nav calendar-nav-disabled" th:unless="${calendar.previousMonth != null}"></span>
+    <h3 th:text="${calendar.monthLabel}">November 2026</h3>
+    <a
+      class="calendar-nav"
+      th:if="${calendar.nextMonth != null}"
+      th:href="|${basePath}?month=${calendar.nextMonth}|"
+      aria-label="Next month"
+    >
+      →
+    </a>
+    <span class="calendar-nav calendar-nav-disabled" th:unless="${calendar.nextMonth != null}"></span>
+  </div>
+  <form class="calendar-jump" method="get" th:action="${basePath}">
+    <label for="calendar-month" th:for="|calendar-month-${basePath == '/' ? 'home' : 'history'}|">Jump to month</label>
+    <input
+      type="month"
+      name="month"
+      id="calendar-month"
+      th:id="|calendar-month-${basePath == '/' ? 'home' : 'history'}|"
+      th:value="${calendar.month}"
+      min="0001-01"
+      max="9999-12"
+      required
+    />
+    <button class="button secondary small" type="submit">Go</button>
+  </form>
+  <div class="calendar-grid" role="group" aria-label="Completed workouts by date">
+    <span class="calendar-weekday">Mon</span>
+    <span class="calendar-weekday">Tue</span>
+    <span class="calendar-weekday">Wed</span>
+    <span class="calendar-weekday">Thu</span>
+    <span class="calendar-weekday">Fri</span>
+    <span class="calendar-weekday">Sat</span>
+    <span class="calendar-weekday">Sun</span>
+    <th:block th:each="calendarDay : ${calendar.days}">
+      <span class="calendar-blank" th:if="${calendarDay.date == null}"></span>
+      <a
+        class="calendar-day"
+        th:if="${calendarDay.date != null}"
+        th:classappend="${calendarDay.selected} ? ' selected'"
+        th:href="|${basePath}?day=${calendarDay.date}|"
+        th:aria-label="|${calendarDay.date}, sessions: ${calendarDay.sessions}|"
+        th:aria-current="${calendarDay.selected} ? 'date' : null"
+      >
+        <span th:text="${calendarDay.date.dayOfMonth}">1</span>
+        <small th:if="${calendarDay.sessions > 0}" th:text="${calendarDay.sessions}">1</small>
+      </a>
+    </th:block>
+  </div>
+</div>

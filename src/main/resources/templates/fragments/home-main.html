@@ -105,17 +105,27 @@
   <section class="panel recent">
     <div class="section-heading">
       <div>
-        <span class="eyebrow">KEEP THE MOMENTUM</span>
-        <h2>Recent sessions</h2>
+        <span class="eyebrow">YOUR TRAINING DAYS</span>
+        <h2>Workout calendar</h2>
       </div>
       <a class="text-link" href="/history">View history →</a>
     </div>
-    <div th:if="${#lists.isEmpty(recent)}" class="empty compact">Completed workouts will appear here.</div>
+    <div th:replace="~{fragments/session-calendar :: calendar('/', ${calendar})}"></div>
+    <div class="calendar-session-heading">
+      <h3 th:text="${calendar.selectedLabel ?: 'Choose a day'}">Selected day</h3>
+      <span th:if="${calendar.selectedDate != null}" th:text="|Sessions: ${#lists.size(recent)}|">Sessions: 0</span>
+    </div>
+    <div th:if="${calendar.selectedDate == null}" class="empty compact">Select a date to see its sessions.</div>
+    <div th:if="${calendar.selectedDate != null and #lists.isEmpty(recent)}" class="empty compact">
+      No completed workouts on this day.
+    </div>
     <div class="list-row workout-record-row" th:each="w:${recent}">
       <a th:href="@{/workouts/{id}(id=${w.id})}">
         <span>
           <strong th:text="${w.title}">Workout</strong>
-          <small th:text="${#dates.format(w.started_at,'d MMM yyyy · HH:mm')} + ' · ' + ${w.durationLabel}">Date</small>
+          <small th:text="${#dates.format(w.completed_at,'d MMM yyyy · HH:mm')} + ' · ' + ${w.durationLabel}">
+            Date
+          </small>
         </span>
         <span class="badge">DONE</span>
       </a>

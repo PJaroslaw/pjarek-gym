@@ -20,7 +20,7 @@ The workout page shows completed sets separately from the next set to log. Exerc
 
 An active workout has one elapsed-time clock. Paused time is excluded, and finishing the workout stores its elapsed duration. Logging a set starts that exercise's rest countdown; canceling the countdown does not change the workout clock or logged set.
 
-Finishing a workout marks it complete. The history page lists completed sessions and provides Show and Delete actions. A completed session's summary displays the date, workout duration, exercises, and logged sets; it is read-only except for deleting the session. Recent sessions on the overview do not expose delete controls.
+Finishing a workout marks it complete. The overview and history pages show completed sessions in monthly calendars, grouped by completion date in the server's time zone. Dates with sessions show their count. Select a date to see that day's sessions, use the month arrows to browse, or jump directly to a month. Calendar links use the `day` query parameter for a selected date and `month` for browsing without a selected date. The overview links to session summaries without delete controls. History provides Show and Delete actions for the selected day's sessions and returns to the selected date after a deletion. A completed session's summary displays the date, workout duration, exercises, and logged sets; it is read-only except for deleting the session.
 
 ## Accounts and preferences
 
