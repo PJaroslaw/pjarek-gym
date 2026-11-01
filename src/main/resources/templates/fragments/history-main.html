@@ -10,11 +10,19 @@
     <section class="panel">
       <div class="section-heading">
         <div>
-          <span class="eyebrow">RECENT</span>
+          <span class="eyebrow">TRAINING DAYS</span>
           <h2>Completed sessions</h2>
         </div>
       </div>
-      <div class="empty" th:if="${#lists.isEmpty(history)}">Finish a workout and it will show up here.</div>
+      <div th:replace="~{fragments/session-calendar :: calendar('/history', ${calendar})}"></div>
+      <div class="calendar-session-heading">
+        <h3 th:text="${calendar.selectedLabel ?: 'Choose a day'}">Selected day</h3>
+        <span th:if="${calendar.selectedDate != null}" th:text="|Sessions: ${#lists.size(history)}|">Sessions: 0</span>
+      </div>
+      <div class="empty compact" th:if="${calendar.selectedDate == null}">Select a date to see its sessions.</div>
+      <div class="empty compact" th:if="${calendar.selectedDate != null and #lists.isEmpty(history)}">
+        No completed workouts on this day.
+      </div>
       <div class="list-row history-session-row" th:each="w:${history}">
         <span>
           <strong class="history-session-title" th:text="${w.title}">Workout</strong>
@@ -31,6 +39,7 @@
             th:action="@{/workouts/{id}/delete(id=${w.id},returnTo='history')}"
             onsubmit="return confirm('Delete this completed workout and its logged sets? This cannot be undone.');"
           >
+            <input type="hidden" name="day" th:value="${calendar.selectedDate}" />
             <button class="button danger-strong small">Delete</button>
           </form>
         </div>

@@ -18,6 +18,8 @@ PostgreSQL is the source of truth for accounts, routines, workouts, sets, user p
 
 User-owned records reference their owner and cascade when that user is deleted. Routine days and items belong to routines, workout exercises belong to workouts, and workout sets belong to workout exercises. Deleting a workout removes its exercises, sets, and events. Exercise catalog rows remain separate from user-owned IDs so imported exercise identifiers stay aligned with upstream data.
 
+Completed workout calendar lookups use the partial `workout_owner_completed_idx` index on owner and completion time. It supports the month indicators and selected-day session queries without indexing active workouts.
+
 Routine and workout exercise rows keep the planned set count, rep range, and rest duration. A workout exercise also stores the instructions used for that session. These snapshots preserve context if the exercise catalog or routine changes later.
 
 ## Canonical values
