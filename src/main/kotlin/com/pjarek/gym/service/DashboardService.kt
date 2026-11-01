@@ -10,18 +10,18 @@ import java.util.UUID
 import org.springframework.stereotype.Service
 
 @Service
-class DashboardService(private val repository: DashboardRepository, private val calendar: WorkoutCalendar, private val accounts: AccountService) {
+class DashboardService(private val dashboardRepository: DashboardRepository, private val workoutCalendar: WorkoutCalendar, private val accountService: AccountService) {
     fun overview(owner: UUID, month: String?, day: LocalDate?): OverviewPage {
         val (visibleMonth, selectedDate) = calendarSelection(month, day)
         val recent = selectedDate?.let { date ->
-            repository.completedWorkouts(owner, calendar.boundary(date), calendar.boundary(date.plusDays(1)))
+            dashboardRepository.completedWorkouts(owner, workoutCalendar.boundary(date), workoutCalendar.boundary(date.plusDays(1)))
                 .map { it.copy(durationLabel = formatDuration(it.elapsedSeconds)) }
         }.orEmpty()
-        val trend = repository.volumeTrend(owner).reversed()
+        val trend = dashboardRepository.volumeTrend(owner).reversed()
         val volumeMax = trend.maxOfOrNull { it.volume.toDouble() }?.coerceAtLeast(1.0) ?: 1.0
         return OverviewPage(
-            calendar.view(owner, visibleMonth, selectedDate), repository.routines(owner), repository.routineDays(owner),
-            repository.activeWorkouts(owner), recent, repository.stats(owner),
+            workoutCalendar.view(owner, visibleMonth, selectedDate), dashboardRepository.routines(owner), dashboardRepository.routineDays(owner),
+            dashboardRepository.activeWorkouts(owner), recent, dashboardRepository.stats(owner),
             trend.map { it.copy(barHeight = maxOf(6.0, 85 * it.volume.toDouble() / volumeMax)) }
         )
     }
@@ -29,14 +29,14 @@ class DashboardService(private val repository: DashboardRepository, private val 
     fun history(owner: UUID, month: String?, day: LocalDate?): HistoryPage {
         val (visibleMonth, selectedDate) = calendarSelection(month, day)
         val history = selectedDate?.let { date ->
-            repository.history(owner, calendar.boundary(date), calendar.boundary(date.plusDays(1)))
+            dashboardRepository.history(owner, workoutCalendar.boundary(date), workoutCalendar.boundary(date.plusDays(1)))
                 .map { it.copy(durationLabel = formatDuration(it.elapsedSeconds)) }
         }.orEmpty()
-        val unit = accounts.account(owner).weightUnit
-        val records = repository.records(owner).map {
+        val unit = accountService.account(owner).weightUnit
+        val records = dashboardRepository.records(owner).map {
             it.copy(displayWeight = WeightUnits.fromKilograms(it.maxWeight, unit), weightUnit = unit)
         }
-        return HistoryPage(calendar.view(owner, visibleMonth, selectedDate), history, records)
+        return HistoryPage(workoutCalendar.view(owner, visibleMonth, selectedDate), history, records)
     }
 
     private fun formatDuration(seconds: Int): String {

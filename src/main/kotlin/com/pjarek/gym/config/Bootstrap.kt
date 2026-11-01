@@ -10,7 +10,7 @@ import org.springframework.stereotype.Component
 
 @Component
 class Bootstrap(
-    private val accounts: AccountRepository,
+    private val accountRepository: AccountRepository,
     private val encoder: PasswordEncoder,
     private val catalogImporter: ExerciseCatalogImporter,
     private val datasetSync: ExerciseDatasetSyncService,
@@ -21,7 +21,7 @@ class Bootstrap(
         require(adminName.isNotBlank() && adminPassword.isNotEmpty()) {
             "Set APP_ADMIN_USERNAME and APP_ADMIN_PASSWORD before starting the app"
         }
-        accounts.createAdminIfMissing(adminName, encoder.encode(adminPassword)!!)
+        accountRepository.createAdminIfMissing(adminName, encoder.encode(adminPassword)!!)
         catalogImporter.seedWhenEmpty()
         datasetSync.syncOnStartup()
     }

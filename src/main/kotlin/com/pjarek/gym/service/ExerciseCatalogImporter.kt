@@ -9,10 +9,10 @@ import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 
 @Component
-class ExerciseCatalogImporter(private val repository: ExerciseRepository, private val mapper: JsonMapper) {
+class ExerciseCatalogImporter(private val exerciseRepository: ExerciseRepository, private val mapper: JsonMapper) {
     @Transactional
     fun seedWhenEmpty() {
-        val count = repository.count()
+        val count = exerciseRepository.count()
         if (count == 0) {
             val catalog = mapper.readTree(ClassPathResource("exercises.json").inputStream)
             validate(catalog)
@@ -27,7 +27,7 @@ class ExerciseCatalogImporter(private val repository: ExerciseRepository, privat
     }
 
     private fun importCatalog(data: JsonNode) {
-        repository.deactivateImported()
+        exerciseRepository.deactivateImported()
         data.forEach { item -> insertExercise(item) }
     }
 
@@ -52,7 +52,7 @@ class ExerciseCatalogImporter(private val repository: ExerciseRepository, privat
     }
 
     private fun insertExercise(item: JsonNode) {
-        repository.upsertImported(CatalogExercise(
+        exerciseRepository.upsertImported(CatalogExercise(
             item.path("id").asText(), item.path("name").asText(), item.path("category").asText(""),
             item.path("equipment").asText(""), item.path("level").asText(""), item.path("force").asText(""),
             item.path("mechanic").asText(""), item.path("primaryMuscles").joinToString(", ") { it.asText() },

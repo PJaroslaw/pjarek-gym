@@ -13,27 +13,27 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class WorkoutService(
-    private val workouts: WorkoutRepository,
-    private val exercises: ExerciseRepository,
-    private val accounts: AccountService,
-    private val access: UserAccess
+    private val workoutRepository: WorkoutRepository,
+    private val exerciseRepository: ExerciseRepository,
+    private val accountService: AccountService,
+    private val userAccess: UserAccess
 ) {
     @Transactional
     fun startAdHoc(owner: UUID, exerciseId: Long?): Pair<UUID, UUID?> {
-        if (exerciseId != null) require(exercises.active(exerciseId)) { "Choose an exercise from the library." }
-        val workout = workouts.createAdHoc(owner)
+        if (exerciseId != null) require(exerciseRepository.active(exerciseId)) { "Choose an exercise from the library." }
+        val workout = workoutRepository.createAdHoc(owner)
         return workout to exerciseId?.let {
-            workouts.addInitialExercise(workout, it) ?: throw IllegalArgumentException("Choose an exercise from the library.")
+            workoutRepository.addInitialExercise(workout, it) ?: throw IllegalArgumentException("Choose an exercise from the library.")
         }
     }
 
     fun page(id: UUID, owner: UUID, exercise: UUID?, restSeconds: Int?, restStartedAt: Long?): WorkoutPage {
-        access.ownedWorkout(id, owner)
-        val workout = workouts.find(id)
-        val items = workouts.items(id)
-        val unit = accounts.account(owner).weightUnit
+        userAccess.ownedWorkout(id, owner)
+        val workout = workoutRepository.find(id)
+        val items = workoutRepository.items(id)
+        val unit = accountService.account(owner).weightUnit
         val completed = workout["status"] == "COMPLETED"
-        val sessionSets = if (completed) workouts.sessionSets(id).map { it.withDisplayWeight(unit) } else emptyList()
+        val sessionSets = if (completed) workoutRepository.sessionSets(id).map { it.withDisplayWeight(unit) } else emptyList()
         val requestedCurrent = exercise?.let { requested -> items.firstOrNull { it["id"] == requested } }
         require(exercise == null || requestedCurrent != null) { "Exercise not found in this workout." }
         val current = requestedCurrent
@@ -43,8 +43,8 @@ class WorkoutService(
             }
             ?: items.lastOrNull()
         val currentIndex = current?.let { items.indexOf(it) } ?: -1
-        val storedSets = current?.let { workouts.storedSets(it["id"] as UUID) }.orEmpty()
-        val previousSets = current?.let { workouts.previousSets(owner, it["exercise_id"] as Long) }.orEmpty()
+        val storedSets = current?.let { workoutRepository.storedSets(it["id"] as UUID) }.orEmpty()
+        val previousSets = current?.let { workoutRepository.previousSets(owner, it["exercise_id"] as Long) }.orEmpty()
         val sets = storedSets.map { it.withDisplayWeight(unit) }
         val previousDisplaySets = previousSets.map { it.withDisplayWeight(unit) }
         val latestCurrentWeight = sets.lastOrNull()?.get("displayWeight") as? BigDecimal
@@ -52,69 +52,69 @@ class WorkoutService(
         val defaultReps = current?.let { if ((it["planned_sets"] as Number).toInt() > 0) it["max_reps"] ?: "" else "" } ?: ""
         return WorkoutPage(
             workout, restRemainingMillis(restSeconds, restStartedAt), items,
-            if (completed) workouts.sessionVolume(id) else null, sessionSets,
+            if (completed) workoutRepository.sessionVolume(id) else null, sessionSets,
             current, currentIndex + 1, items.getOrNull(currentIndex - 1)?.get("id") as? UUID,
-            items.getOrNull(currentIndex + 1)?.get("id") as? UUID, exercises.activeNames(),
+            items.getOrNull(currentIndex + 1)?.get("id") as? UUID, exerciseRepository.activeNames(),
             sets, previousDisplaySets, if (unit == "LB") "0.25" else "0.01", defaultReps,
             latestCurrentWeight ?: previousWeight ?: BigDecimal.ZERO
         )
     }
 
     fun addExercise(id: UUID, owner: UUID, exerciseId: Long): UUID {
-        access.ownedWorkout(id, owner); access.requireActive(id)
-        return workouts.addExercise(id, exerciseId) ?: throw IllegalArgumentException("Choose an exercise from the list.")
+        userAccess.ownedWorkout(id, owner); userAccess.requireActive(id)
+        return workoutRepository.addExercise(id, exerciseId) ?: throw IllegalArgumentException("Choose an exercise from the list.")
     }
 
     @Transactional
     fun logSet(id: UUID, owner: UUID, itemId: UUID, reps: Int, weight: BigDecimal): LoggedSet {
-        access.ownedWorkout(id, owner); access.requireActive(id)
-        val unit = accounts.account(owner).weightUnit
+        userAccess.ownedWorkout(id, owner); userAccess.requireActive(id)
+        val unit = accountService.account(owner).weightUnit
         validateSet(reps, weight, unit)
-        require(workouts.containsItem(id, itemId))
-        val restSeconds = workouts.restSeconds(id, itemId)
-        workouts.insertSet(itemId, reps, WeightUnits.toKilograms(weight, unit))
+        require(workoutRepository.containsItem(id, itemId))
+        val restSeconds = workoutRepository.restSeconds(id, itemId)
+        workoutRepository.insertSet(itemId, reps, WeightUnits.toKilograms(weight, unit))
         return LoggedSet(itemId, restSeconds, Instant.now().toEpochMilli())
     }
 
     fun editSet(id: UUID, owner: UUID, setId: UUID, reps: Int, weight: BigDecimal): UUID {
-        access.ownedWorkout(id, owner); access.requireActive(id)
-        val unit = accounts.account(owner).weightUnit
+        userAccess.ownedWorkout(id, owner); userAccess.requireActive(id)
+        val unit = accountService.account(owner).weightUnit
         validateSet(reps, weight, unit)
-        val itemId = workouts.setItem(id, setId) ?: throw IllegalArgumentException("Set not found in this workout.")
-        workouts.editSet(setId, reps, WeightUnits.toKilograms(weight, unit))
+        val itemId = workoutRepository.setItem(id, setId) ?: throw IllegalArgumentException("Set not found in this workout.")
+        workoutRepository.editSet(setId, reps, WeightUnits.toKilograms(weight, unit))
         return itemId
     }
 
     @Transactional
     fun deleteSet(id: UUID, owner: UUID, setId: UUID): UUID {
-        access.ownedWorkout(id, owner); access.requireActive(id)
-        val itemId = workouts.setItem(id, setId) ?: throw IllegalArgumentException("Set not found in this workout.")
-        workouts.deleteSet(setId, itemId)
+        userAccess.ownedWorkout(id, owner); userAccess.requireActive(id)
+        val itemId = workoutRepository.setItem(id, setId) ?: throw IllegalArgumentException("Set not found in this workout.")
+        workoutRepository.deleteSet(setId, itemId)
         return itemId
     }
 
     fun finish(id: UUID, owner: UUID) {
-        access.ownedWorkout(id, owner)
-        require(workouts.finish(id) == 1) { "This workout is already finished." }
+        userAccess.ownedWorkout(id, owner)
+        require(workoutRepository.finish(id) == 1) { "This workout is already finished." }
     }
 
     @Transactional
     fun pause(id: UUID, owner: UUID) {
-        access.ownedWorkout(id, owner)
-        require(workouts.pause(id) == 1) { "This workout is not running." }
-        workouts.event(id, "PAUSED")
+        userAccess.ownedWorkout(id, owner)
+        require(workoutRepository.pause(id) == 1) { "This workout is not running." }
+        workoutRepository.event(id, "PAUSED")
     }
 
     @Transactional
     fun resume(id: UUID, owner: UUID) {
-        access.ownedWorkout(id, owner)
-        require(workouts.resume(id) == 1) { "This workout is not paused." }
-        workouts.event(id, "RESUMED")
+        userAccess.ownedWorkout(id, owner)
+        require(workoutRepository.resume(id) == 1) { "This workout is not paused." }
+        workoutRepository.event(id, "RESUMED")
     }
 
     fun delete(id: UUID, owner: UUID) {
-        access.ownedWorkout(id, owner)
-        workouts.delete(id)
+        userAccess.ownedWorkout(id, owner)
+        workoutRepository.delete(id)
     }
 
     private fun validateSet(reps: Int, weight: BigDecimal, unit: String) {

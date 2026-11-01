@@ -5,25 +5,25 @@ import java.util.Locale
 import org.springframework.stereotype.Service
 
 @Service
-class ExerciseSearchService(private val repository: ExerciseRepository) {
+class ExerciseSearchService(private val exerciseRepository: ExerciseRepository) {
     fun search(query: String): List<Map<String, Any?>> {
         val term = query.trim()
         if (term.length < MIN_QUERY_LENGTH) return emptyList()
         require(term.length <= MAX_QUERY_LENGTH) { "Search terms can be up to $MAX_QUERY_LENGTH characters." }
         val terms = tokenize(term)
         if (terms.isEmpty()) return emptyList()
-        return repository.searchPicker(normalize(term), terms)
+        return exerciseRepository.searchPicker(normalize(term), terms)
     }
 
     fun searchLibrary(query: String): List<Map<String, Any?>> {
         require(query.length <= MAX_QUERY_LENGTH) { "Search terms can be up to $MAX_QUERY_LENGTH characters." }
         val term = query.trim()
         if (term.isEmpty()) {
-            return repository.library()
+            return exerciseRepository.library()
         }
         val terms = tokenize(term)
         if (terms.isEmpty()) return emptyList()
-        return repository.searchLibrary(normalize(term), terms)
+        return exerciseRepository.searchLibrary(normalize(term), terms)
     }
 
     private fun tokenize(query: String): List<String> =

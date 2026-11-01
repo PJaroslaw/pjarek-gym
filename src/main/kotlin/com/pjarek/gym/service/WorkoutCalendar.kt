@@ -13,12 +13,12 @@ import java.util.UUID
 import org.springframework.stereotype.Component
 
 @Component
-class WorkoutCalendar(private val repository: DashboardRepository) {
+class WorkoutCalendar(private val dashboardRepository: DashboardRepository) {
     private val zone = ZoneId.systemDefault()
 
     fun view(ownerId: UUID, month: YearMonth, selectedDate: LocalDate?): WorkoutCalendarView {
         val start = month.atDay(1)
-        val counts = repository.completedDates(ownerId, boundary(start), boundary(start.plusMonths(1)))
+        val counts = dashboardRepository.completedDates(ownerId, boundary(start), boundary(start.plusMonths(1)))
             .map { it.toInstant().atZone(zone).toLocalDate() }.groupingBy { it }.eachCount()
         val padding = start.dayOfWeek.value - 1
         val days = List(padding) { WorkoutCalendarDay(null, 0, false) } +

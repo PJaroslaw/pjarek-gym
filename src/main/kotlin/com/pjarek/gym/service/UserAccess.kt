@@ -10,26 +10,26 @@ import org.springframework.stereotype.Service
 
 @Service
 class UserAccess(
-    private val accounts: AccountRepository,
-    private val routines: RoutineRepository,
-    private val workouts: WorkoutRepository
+    private val accountRepository: AccountRepository,
+    private val routineRepository: RoutineRepository,
+    private val workoutRepository: WorkoutRepository
 ) {
-    fun userId(user: UserDetails): UUID = accounts.findByUsername(user.username)?.id
+    fun userId(user: UserDetails): UUID = accountRepository.findByUsername(user.username)?.id
         ?: throw AccessDeniedException("User is not available")
 
     fun ownedRoutine(id: UUID, owner: UUID) {
-        if (!routines.owned(id, owner)) throw AccessDeniedException("Routine is not available")
+        if (!routineRepository.owned(id, owner)) throw AccessDeniedException("Routine is not available")
     }
 
     fun ownedDay(day: UUID, routine: UUID) {
-        if (!routines.dayBelongs(day, routine)) throw AccessDeniedException("Routine day is not available")
+        if (!routineRepository.dayBelongs(day, routine)) throw AccessDeniedException("Routine day is not available")
     }
 
     fun ownedWorkout(id: UUID, owner: UUID) {
-        if (!workouts.owned(id, owner)) throw AccessDeniedException("Workout is not available")
+        if (!workoutRepository.owned(id, owner)) throw AccessDeniedException("Workout is not available")
     }
 
     fun requireActive(id: UUID) {
-        require(workouts.status(id) == "IN_PROGRESS")
+        require(workoutRepository.status(id) == "IN_PROGRESS")
     }
 }

@@ -10,76 +10,76 @@ import org.springframework.transaction.annotation.Transactional
 
 @Service
 class RoutineService(
-    private val routines: RoutineRepository,
-    private val exercises: ExerciseRepository,
-    private val workouts: WorkoutRepository,
-    private val access: UserAccess
+    private val routineRepository: RoutineRepository,
+    private val exerciseRepository: ExerciseRepository,
+    private val workoutRepository: WorkoutRepository,
+    private val userAccess: UserAccess
 ) {
-    fun list(owner: UUID): List<Map<String, Any?>> = routines.list(owner)
+    fun list(owner: UUID): List<Map<String, Any?>> = routineRepository.list(owner)
 
     fun create(owner: UUID, name: String?): UUID {
         val routineName = name?.trim().orEmpty()
         require(routineName.isNotBlank() && routineName.length <= 160) { "Enter a name for your routine." }
-        return routines.create(owner, routineName)
+        return routineRepository.create(owner, routineName)
     }
 
     fun detail(id: UUID, owner: UUID): RoutineDetail {
-        access.ownedRoutine(id, owner)
-        return RoutineDetail(routines.find(id), routines.days(id), routines.items(id))
+        userAccess.ownedRoutine(id, owner)
+        return RoutineDetail(routineRepository.find(id), routineRepository.days(id), routineRepository.items(id))
     }
 
     fun addDay(id: UUID, owner: UUID, name: String) {
-        access.ownedRoutine(id, owner)
+        userAccess.ownedRoutine(id, owner)
         validateDayName(name)
-        routines.addDay(id, name.trim())
+        routineRepository.addDay(id, name.trim())
     }
 
     fun renameDay(id: UUID, dayId: UUID, owner: UUID, name: String) {
-        access.ownedRoutine(id, owner); access.ownedDay(dayId, id)
+        userAccess.ownedRoutine(id, owner); userAccess.ownedDay(dayId, id)
         validateDayName(name)
-        routines.renameDay(id, dayId, name.trim())
+        routineRepository.renameDay(id, dayId, name.trim())
     }
 
     @Transactional
     fun deleteDay(id: UUID, dayId: UUID, owner: UUID) {
-        access.ownedRoutine(id, owner); access.ownedDay(dayId, id)
-        routines.deleteDay(id, dayId)
+        userAccess.ownedRoutine(id, owner); userAccess.ownedDay(dayId, id)
+        routineRepository.deleteDay(id, dayId)
     }
 
     fun rename(id: UUID, owner: UUID, name: String) {
-        access.ownedRoutine(id, owner)
+        userAccess.ownedRoutine(id, owner)
         require(name.isNotBlank() && name.length <= 160)
-        routines.rename(id, name.trim())
+        routineRepository.rename(id, name.trim())
     }
 
     fun delete(id: UUID, owner: UUID) {
-        access.ownedRoutine(id, owner)
-        routines.delete(id)
+        userAccess.ownedRoutine(id, owner)
+        routineRepository.delete(id)
     }
 
     fun deleteItem(id: UUID, itemId: UUID, owner: UUID) {
-        access.ownedRoutine(id, owner)
-        routines.deleteItem(id, itemId)
+        userAccess.ownedRoutine(id, owner)
+        routineRepository.deleteItem(id, itemId)
     }
 
     fun editItem(id: UUID, itemId: UUID, owner: UUID, exerciseId: Long, sets: Int, minReps: Int, maxReps: Int, rest: Int) {
-        access.ownedRoutine(id, owner)
+        userAccess.ownedRoutine(id, owner)
         validateExercisePlan(sets, minReps, maxReps, rest)
-        require(exercises.active(exerciseId)) { "Choose an exercise from the search results." }
-        require(routines.editItem(id, itemId, exerciseId, sets, minReps, maxReps, rest) == 1) { "Exercise not found in this routine." }
+        require(exerciseRepository.active(exerciseId)) { "Choose an exercise from the search results." }
+        require(routineRepository.editItem(id, itemId, exerciseId, sets, minReps, maxReps, rest) == 1) { "Exercise not found in this routine." }
     }
 
     fun addItem(id: UUID, dayId: UUID, owner: UUID, exerciseId: Long, sets: Int, minReps: Int, maxReps: Int, rest: Int) {
-        access.ownedRoutine(id, owner); access.ownedDay(dayId, id)
+        userAccess.ownedRoutine(id, owner); userAccess.ownedDay(dayId, id)
         validateExercisePlan(sets, minReps, maxReps, rest)
-        require(exercises.active(exerciseId)) { "Choose an exercise from the search results." }
-        routines.addItem(dayId, exerciseId, sets, minReps, maxReps, rest)
+        require(exerciseRepository.active(exerciseId)) { "Choose an exercise from the search results." }
+        routineRepository.addItem(dayId, exerciseId, sets, minReps, maxReps, rest)
     }
 
     @Transactional
     fun start(id: UUID, dayId: UUID, owner: UUID): UUID {
-        access.ownedRoutine(id, owner); access.ownedDay(dayId, id)
-        return workouts.createFromRoutine(owner, dayId, routines.dayName(dayId))
+        userAccess.ownedRoutine(id, owner); userAccess.ownedDay(dayId, id)
+        return workoutRepository.createFromRoutine(owner, dayId, routineRepository.dayName(dayId))
     }
 
     private fun validateDayName(name: String) {
