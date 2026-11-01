@@ -46,6 +46,14 @@ docker compose -f compose.yaml -f compose.ollama-gpu.yaml --profile ollama up -d
 
 This reserves the host's NVIDIA GPUs for Ollama. The override is separate so the regular Compose setup continues to work on CPU-only hosts. See [Docker's Compose GPU setup](https://docs.docker.com/compose/how-tos/gpu-support/) for host prerequisites.
 
+On a Linux host with an AMD GPU supported by ROCm, use the AMD override instead:
+
+```sh
+docker compose -f compose.yaml -f compose.ollama-amd.yaml --profile ollama up -d
+```
+
+The AMD override selects Ollama's ROCm image and passes `/dev/kfd` and `/dev/dri` into the container. GPU acceleration depends on a compatible AMD GPU and host driver setup; check Ollama's [AMD GPU support list](https://github.com/ollama/ollama/blob/main/docs/gpu.mdx) and [Docker instructions](https://github.com/ollama/ollama/blob/main/docs/docker.mdx) before deployment.
+
 ## Configuration
 
 | Variable                       | Default          | Purpose                                          |
