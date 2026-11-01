@@ -3,10 +3,11 @@ package com.pjarek.gym
 import org.junit.jupiter.api.Assertions.assertEquals
 import org.junit.jupiter.api.Assertions.assertThrows
 import org.junit.jupiter.api.Test
-import org.springframework.jdbc.core.JdbcTemplate
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate
+import org.springframework.jdbc.datasource.DriverManagerDataSource
 
 class ExerciseSearchServiceTest {
-    private val service = ExerciseSearchService(JdbcTemplate())
+    private val service = ExerciseSearchService(ExerciseRepository(NamedParameterJdbcTemplate(DriverManagerDataSource())))
 
     @Test
     fun `short search terms return no results without querying the database`() {

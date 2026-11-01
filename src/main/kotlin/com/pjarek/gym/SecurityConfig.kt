@@ -5,7 +5,6 @@ import jakarta.servlet.http.HttpServletRequest
 import jakarta.servlet.http.HttpServletResponse
 import org.springframework.context.annotation.Bean
 import org.springframework.context.annotation.Configuration
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.security.authentication.AnonymousAuthenticationToken
 import org.springframework.security.config.annotation.web.builders.HttpSecurity
 import org.springframework.security.core.context.SecurityContextHolder
@@ -24,25 +23,21 @@ class SecurityConfig {
     fun passwordEncoder(): PasswordEncoder = LongPasswordEncoder()
 
     @Bean
-    fun userDetailsService(jdbc: JdbcTemplate): UserDetailsService = UserDetailsService { username ->
-        val users = jdbc.query(
-            "SELECT username,password_hash,role,enabled FROM app_user WHERE username = ?",
-            { rs, _ -> User.withUsername(rs.getString("username"))
-                .password(rs.getString("password_hash"))
-                .roles(rs.getString("role"))
-                .disabled(!rs.getBoolean("enabled")).build() }, username
-        )
-        users.firstOrNull() ?: throw UsernameNotFoundException("User not found")
+    fun userDetailsService(accounts: AccountRepository): UserDetailsService = UserDetailsService { username ->
+        val account = accounts.findByUsername(username)
+            ?: throw UsernameNotFoundException("User not found")
+        User.withUsername(account.username).password(account.passwordHash).roles(account.role)
+            .disabled(!account.enabled).build()
     }
 
     @Bean
-    fun filterChain(http: HttpSecurity, jdbc: JdbcTemplate): SecurityFilterChain {
+    fun filterChain(http: HttpSecurity, accounts: AccountService): SecurityFilterChain {
         val forbiddenHandler = AccessDeniedHandler { request, response, _ ->
             response.status = 403
             request.getRequestDispatcher("/forbidden").forward(request, response)
         }
         return http
-        .addFilterBefore(TemporaryPasswordFilter(jdbc), AuthorizationFilter::class.java)
+        .addFilterBefore(TemporaryPasswordFilter(accounts), AuthorizationFilter::class.java)
         .authorizeHttpRequests { auth -> auth
             .requestMatchers("/login", "/forbidden", "/favicon.ico", "/assets/**", "/exercise-images/**", "/error").permitAll()
             .requestMatchers("/admin/**").hasRole("ADMIN")
@@ -51,7 +46,7 @@ class SecurityConfig {
         .exceptionHandling { exceptions -> exceptions.accessDeniedHandler(forbiddenHandler) }
         .formLogin { form -> form.loginPage("/login").successHandler { _, response, authentication ->
             val username = authentication.name
-            val mustChange = jdbc.queryForObject("SELECT must_change_password FROM app_user WHERE username=?", Boolean::class.java, username)!!
+            val mustChange = accounts.account(username).mustChangePassword
             response.sendRedirect(if (mustChange) "/change-password" else "/")
         }.permitAll() }
         .logout { logout -> logout.logoutSuccessUrl("/login?logout") }
@@ -59,7 +54,7 @@ class SecurityConfig {
     }
 }
 
-private class TemporaryPasswordFilter(private val jdbc: JdbcTemplate) : OncePerRequestFilter() {
+private class TemporaryPasswordFilter(private val accounts: AccountService) : OncePerRequestFilter() {
     override fun shouldNotFilter(request: HttpServletRequest): Boolean =
         request.requestURI == "/login" || request.requestURI == "/logout" ||
             request.requestURI == "/change-password" || request.requestURI == "/error" ||
@@ -69,11 +64,7 @@ private class TemporaryPasswordFilter(private val jdbc: JdbcTemplate) : OncePerR
     override fun doFilterInternal(request: HttpServletRequest, response: HttpServletResponse, chain: FilterChain) {
         val authentication = SecurityContextHolder.getContext().authentication
         if (authentication != null && authentication.isAuthenticated && authentication !is AnonymousAuthenticationToken) {
-            val mustChange = jdbc.queryForObject(
-                "SELECT must_change_password FROM app_user WHERE username=?",
-                Boolean::class.java,
-                authentication.name
-            )!!
+            val mustChange = accounts.account(authentication.name).mustChangePassword
             if (mustChange) {
                 response.sendRedirect("/change-password")
                 return

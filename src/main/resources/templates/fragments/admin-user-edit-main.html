@@ -5,7 +5,7 @@
       <span class="eyebrow">EDIT USER</span>
       <h1 th:text="${account.username}">username</h1>
       <p
-        th:text="${account.role} + (${account.enabled} ? ' · Enabled' : ' · Disabled') + (${account.must_change_password} ? ' · Password change required' : '')"
+        th:text="${account.role} + (${account.enabled} ? ' · Enabled' : ' · Disabled') + (${account.mustChangePassword} ? ' · Password change required' : '')"
       >
         Role
       </p>

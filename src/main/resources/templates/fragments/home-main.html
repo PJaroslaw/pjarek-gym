@@ -84,14 +84,14 @@
           <span class="dashboard-routine-toggle" aria-hidden="true">⌄</span>
         </summary>
         <div class="dashboard-routine-days">
-          <div class="empty compact" th:if="${#lists.isEmpty(routineDays.?[routine_id == #vars.r.id])}">
+          <div class="empty compact" th:if="${#lists.isEmpty(routineDays.?[routineId == #vars.r.id])}">
             This routine has no days yet.
             <a th:href="@{/routines/{id}(id=${r.id})}">Add a day →</a>
           </div>
-          <div class="dashboard-routine-day" th:each="d:${routineDays}" th:if="${d.routine_id == r.id}">
+          <div class="dashboard-routine-day" th:each="d:${routineDays}" th:if="${d.routineId == r.id}">
             <span>
               <strong th:text="${d.name}">Day</strong>
-              <small th:text="'Planned exercises: ' + ${d.exercise_count}">Planned exercises: 0</small>
+              <small th:text="'Planned exercises: ' + ${d.exerciseCount}">Planned exercises: 0</small>
             </span>
             <form method="post" th:action="@{/routines/{r}/days/{d}/start(r=${r.id},d=${d.id})}">
               <button class="button primary small">Start workout →</button>
@@ -123,7 +123,7 @@
       <a th:href="@{/workouts/{id}(id=${w.id})}">
         <span>
           <strong th:text="${w.title}">Workout</strong>
-          <small th:text="${#dates.format(w.completed_at,'d MMM yyyy · HH:mm')} + ' · ' + ${w.durationLabel}">
+          <small th:text="${#dates.format(w.completedAt,'d MMM yyyy · HH:mm')} + ' · ' + ${w.durationLabel}">
             Date
           </small>
         </span>

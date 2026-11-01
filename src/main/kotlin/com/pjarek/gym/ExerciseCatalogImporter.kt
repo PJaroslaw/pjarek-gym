@@ -1,17 +1,16 @@
 package com.pjarek.gym
 
 import org.springframework.core.io.ClassPathResource
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 import org.springframework.transaction.annotation.Transactional
 import tools.jackson.databind.JsonNode
 import tools.jackson.databind.json.JsonMapper
 
 @Component
-class ExerciseCatalogImporter(private val jdbc: JdbcTemplate, private val mapper: JsonMapper) {
+class ExerciseCatalogImporter(private val repository: ExerciseRepository, private val mapper: JsonMapper) {
     @Transactional
     fun seedWhenEmpty() {
-        val count = jdbc.queryForObject("SELECT count(*) FROM exercise", Int::class.java)!!
+        val count = repository.count()
         if (count == 0) {
             val catalog = mapper.readTree(ClassPathResource("exercises.json").inputStream)
             validate(catalog)
@@ -26,7 +25,7 @@ class ExerciseCatalogImporter(private val jdbc: JdbcTemplate, private val mapper
     }
 
     private fun importCatalog(data: JsonNode) {
-        jdbc.update("UPDATE exercise SET active=FALSE WHERE source_id IS NOT NULL")
+        repository.deactivateImported()
         data.forEach { item -> insertExercise(item) }
     }
 
@@ -51,17 +50,12 @@ class ExerciseCatalogImporter(private val jdbc: JdbcTemplate, private val mapper
     }
 
     private fun insertExercise(item: JsonNode) {
-        jdbc.update(
-            """INSERT INTO exercise(source_id,name,category,equipment,difficulty,force_type,mechanic,primary_muscles,secondary_muscles,instructions,image_paths,active)
-               VALUES (?,?,?,?,?,?,?,?,?,?,?,TRUE) ON CONFLICT(source_id) DO UPDATE SET name=excluded.name,category=excluded.category,equipment=excluded.equipment,
-                difficulty=excluded.difficulty,force_type=excluded.force_type,mechanic=excluded.mechanic,primary_muscles=excluded.primary_muscles,
-               secondary_muscles=excluded.secondary_muscles,instructions=excluded.instructions,image_paths=excluded.image_paths,active=TRUE""".trimIndent(),
-            item.path("id").asText(), item.path("name").asText(), item.path("category").asText(""), item.path("equipment").asText(""),
-            item.path("level").asText(""), item.path("force").asText(""), item.path("mechanic").asText(""),
-            item.path("primaryMuscles").joinToString(", ") { it.asText() },
+        repository.upsertImported(CatalogExercise(
+            item.path("id").asText(), item.path("name").asText(), item.path("category").asText(""),
+            item.path("equipment").asText(""), item.path("level").asText(""), item.path("force").asText(""),
+            item.path("mechanic").asText(""), item.path("primaryMuscles").joinToString(", ") { it.asText() },
             item.path("secondaryMuscles").joinToString(", ") { it.asText() },
-            item.path("instructions").joinToString("\n") { it.asText() },
-            item.path("images").joinToString(",") { it.asText() }
-        )
+            item.path("instructions").joinToString("\n") { it.asText() }, item.path("images").joinToString(",") { it.asText() }
+        ))
     }
 }

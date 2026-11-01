@@ -7,7 +7,6 @@ import java.time.ZoneId
 import java.time.format.DateTimeFormatter
 import java.util.Locale
 import java.util.UUID
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Component
 
 data class WorkoutCalendarDay(val date: LocalDate?, val sessions: Int, val selected: Boolean)
@@ -23,18 +22,13 @@ data class WorkoutCalendarView(
 )
 
 @Component
-class WorkoutCalendar(private val jdbc: JdbcTemplate) {
+class WorkoutCalendar(private val repository: DashboardRepository) {
     private val zone = ZoneId.systemDefault()
 
     fun view(ownerId: UUID, month: YearMonth, selectedDate: LocalDate?): WorkoutCalendarView {
         val start = month.atDay(1)
-        val counts = jdbc.query(
-            "SELECT completed_at FROM workout WHERE owner_id=? AND status='COMPLETED' AND completed_at>=? AND completed_at<?",
-            { rs, _ -> rs.getTimestamp(1).toInstant().atZone(zone).toLocalDate() },
-            ownerId,
-            boundary(start),
-            boundary(start.plusMonths(1))
-        ).groupingBy { it }.eachCount()
+        val counts = repository.completedDates(ownerId, boundary(start), boundary(start.plusMonths(1)))
+            .map { it.toInstant().atZone(zone).toLocalDate() }.groupingBy { it }.eachCount()
         val padding = start.dayOfWeek.value - 1
         val days = List(padding) { WorkoutCalendarDay(null, 0, false) } +
             (1..month.lengthOfMonth()).map { number ->

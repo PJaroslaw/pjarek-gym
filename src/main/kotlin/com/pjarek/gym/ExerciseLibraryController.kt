@@ -4,7 +4,6 @@ import jakarta.servlet.http.HttpServletResponse
 import java.nio.file.Files
 import java.nio.file.Path
 import org.springframework.beans.factory.annotation.Value
-import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.stereotype.Controller
 import org.springframework.ui.Model
 import org.springframework.web.bind.annotation.GetMapping
@@ -14,7 +13,7 @@ import org.springframework.web.bind.annotation.RequestParam
 import org.springframework.web.bind.annotation.ResponseBody
 
 @Controller
-class ExerciseLibraryController(private val jdbc: JdbcTemplate, private val exerciseSearch: ExerciseSearchService, @Value("\${app.exercise-image-dir}") private val imageDir: String) {
+class ExerciseLibraryController(private val library: ExerciseLibraryService, private val exerciseSearch: ExerciseSearchService, @Value("\${app.exercise-image-dir}") private val imageDir: String) {
     @GetMapping("/exercises")
     fun exercises(@RequestParam(defaultValue="") q: String, @RequestHeader(name="HX-Request", required=false) hx: String?, model: Model): String {
         model.addAttribute("q", q)
@@ -28,17 +27,16 @@ class ExerciseLibraryController(private val jdbc: JdbcTemplate, private val exer
 
     @GetMapping("/exercise/{id}")
     fun exercise(@PathVariable id: Long, model: Model): String {
-        model.addAttribute("exercise", jdbc.queryForMap("SELECT * FROM exercise WHERE id=?", id))
+        model.addAttribute("exercise", library.exercise(id))
         return "exercise-detail"
     }
 
     @GetMapping("/exercise-images/{sourceId}/{index}")
     fun image(@PathVariable sourceId: String, @PathVariable index: Int, response: HttpServletResponse) {
-        require(sourceId.matches(Regex("[A-Za-z0-9_-]+")) && index in 0..3)
         val base = Path.of(imageDir).toAbsolutePath().normalize()
         Files.createDirectories(base)
-        val path = jdbc.query("SELECT image_paths FROM exercise WHERE source_id=?", { rs, _ -> rs.getString(1) }, sourceId).firstOrNull()?.split(',')?.getOrNull(index)
-        if (path == null || !path.matches(Regex("[A-Za-z0-9_-]+/[0-3]\\.jpg"))) { response.sendError(404); return }
+        val path = library.imagePath(sourceId, index)
+        if (path == null) { response.sendError(404); return }
         val currentImage = base.resolve("current/exercises/$path").normalize()
         val legacyImage = base.resolve("exercises/$path").normalize()
         if (!currentImage.startsWith(base) || !legacyImage.startsWith(base)) { response.sendError(404); return }
