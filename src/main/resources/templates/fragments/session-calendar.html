@@ -48,7 +48,7 @@
         class="calendar-day"
         th:if="${calendarDay.date != null}"
         th:classappend="${calendarDay.selected} ? ' selected'"
-        th:href="|${basePath}?month=${calendar.month}&day=${calendarDay.date}|"
+        th:href="|${basePath}?day=${calendarDay.date}|"
         th:aria-label="|${calendarDay.date}, sessions: ${calendarDay.sessions}|"
         th:aria-current="${calendarDay.selected} ? 'date' : null"
       >

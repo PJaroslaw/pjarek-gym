@@ -3,7 +3,6 @@ package com.pjarek.gym
 import java.math.BigDecimal
 import java.time.Instant
 import java.time.LocalDate
-import java.time.YearMonth
 import java.util.UUID
 import org.springframework.jdbc.core.JdbcTemplate
 import org.springframework.format.annotation.DateTimeFormat
@@ -252,7 +251,7 @@ class WorkoutController(private val jdbc: JdbcTemplate, private val access: User
     ): String {
         val destination = when (returnTo) {
             "overview" -> "redirect:/"
-            "history" -> if (day == null) "redirect:/history" else "redirect:/history?month=${YearMonth.from(day)}&day=$day"
+            "history" -> if (day == null) "redirect:/history" else "redirect:/history?day=$day"
             else -> throw IllegalArgumentException("Unknown workout deletion destination")
         }
         access.ownedWorkout(id, access.userId(user))

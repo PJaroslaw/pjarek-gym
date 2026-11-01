@@ -77,6 +77,7 @@ class DashboardController(private val jdbc: JdbcTemplate, private val access: Us
     }
 
     private fun calendarSelection(month: String?, day: LocalDate?): Pair<YearMonth, LocalDate?> {
+        require(month == null || day == null) { "Choose a calendar month or day" }
         val today = LocalDate.now()
         val visibleMonth = if (month == null) day?.let(YearMonth::from) ?: YearMonth.from(today) else
             runCatching { YearMonth.parse(month) }.getOrElse { throw IllegalArgumentException("Invalid calendar month") }

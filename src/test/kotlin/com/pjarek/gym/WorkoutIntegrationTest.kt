@@ -36,19 +36,21 @@ class WorkoutIntegrationTest : IntegrationTestSupport() {
         jdbc.update("INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Another day','COMPLETED',?,NULL)", ownerId, nextDay)
         jdbc.update("INSERT INTO workout(owner_id,title,status,completed_at,active_since) VALUES (?,'Other user session','COMPLETED',?,NULL)", otherId, completedAt)
 
-        val overview = mockMvc.perform(get("/").param("month", "2026-04").param("day", "2026-04-14")
+        val overview = mockMvc.perform(get("/").param("day", "2026-04-14")
             .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
         val overviewSessions = overview.substringAfter("class=\"calendar-session-heading\"").substringBefore("class=\"volume-chart\"")
         assertTrue(overview.contains("aria-label=\"2026-04-14, sessions: 2\""))
-        assertTrue(overview.contains("href=\"/?month=2026-04&amp;day=2026-04-14\""))
+        assertTrue(overview.contains("href=\"/?day=2026-04-14\""))
         assertTrue(overviewSessions.contains("Selected session"))
         assertTrue(overviewSessions.contains("Second selected session"))
         assertFalse(overviewSessions.contains("Another day"))
         assertFalse(overviewSessions.contains("Other user session"))
         assertFalse(overviewSessions.contains("Delete"))
 
-        val history = mockMvc.perform(get("/history").param("month", "2026-04").param("day", "2026-04-14")
+        val history = mockMvc.perform(get("/history").param("day", "2026-04-14")
             .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
+        assertTrue(history.contains("April 2026"))
+        assertTrue(history.contains("href=\"/history?day=2026-04-14\""))
         assertTrue(history.contains("href=\"/workouts/$selectedId\""))
         assertTrue(history.contains("Selected session"))
         assertTrue(history.contains("Second selected session"))
@@ -56,7 +58,7 @@ class WorkoutIntegrationTest : IntegrationTestSupport() {
         assertFalse(history.contains("Other user session"))
         assertTrue(history.contains("returnTo=history"))
 
-        val emptyDay = mockMvc.perform(get("/history").param("month", "2026-04").param("day", "2026-04-16")
+        val emptyDay = mockMvc.perform(get("/history").param("day", "2026-04-16")
             .with(user("exercise-search-test"))).andExpect(status().isOk).andReturn().response.contentAsString
         assertTrue(emptyDay.contains("No completed workouts on this day."))
         assertFalse(emptyDay.contains("Selected session"))
@@ -64,7 +66,7 @@ class WorkoutIntegrationTest : IntegrationTestSupport() {
         mockMvc.perform(post("/workouts/$selectedId/delete").param("returnTo", "history")
             .param("day", "2026-04-14").with(user("exercise-search-test")).with(csrf()))
             .andExpect(status().is3xxRedirection)
-            .andExpect(redirectedUrl("/history?month=2026-04&day=2026-04-14"))
+            .andExpect(redirectedUrl("/history?day=2026-04-14"))
     }
 
     @Test
@@ -77,7 +79,7 @@ class WorkoutIntegrationTest : IntegrationTestSupport() {
         assertTrue(page.contains("type=\"month\""))
         assertTrue(page.contains("Select a date to see its sessions."))
 
-        mockMvc.perform(get("/history").param("month", "2026-04").param("day", "2026-05-01")
+        mockMvc.perform(get("/history").param("month", "2026-04").param("day", "2026-04-14")
             .with(user("exercise-search-test"))).andExpect(status().is3xxRedirection)
         mockMvc.perform(get("/history").param("month", "invalid")
             .with(user("exercise-search-test"))).andExpect(status().is3xxRedirection)
