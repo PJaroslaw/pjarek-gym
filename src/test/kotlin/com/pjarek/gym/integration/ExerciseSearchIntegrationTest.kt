@@ -31,6 +31,13 @@ class ExerciseSearchIntegrationTest : IntegrationTestSupport() {
     }
 
     @Test
+    fun `missing exercise detail returns not found`() {
+        mockMvc.perform(get("/exercise/9223372036854775807")
+            .with(user("exercise-search-test")))
+            .andExpect(status().isNotFound)
+    }
+
+    @Test
     fun `exercise picker matches words in any order and tolerates misspellings`() {
         mockMvc.perform(get("/api/exercises/search")
             .param("q", "bench press dumbbel")

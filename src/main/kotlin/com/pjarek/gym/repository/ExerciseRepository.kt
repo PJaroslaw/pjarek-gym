@@ -32,9 +32,9 @@ class ExerciseRepository(private val jdbc: NamedParameterJdbcTemplate) {
         )
     }
 
-    fun find(id: Long): Map<String, Any?> = jdbc.query(
-        "SELECT * FROM exercise WHERE id=:id", mapOf("id" to id), rows
-    ).first()
+    fun find(id: Long): Map<String, Any?> = jdbc.queryForMap(
+        "SELECT * FROM exercise WHERE id=:id", mapOf("id" to id)
+    )
 
     fun imagePaths(sourceId: String): String? = jdbc.query(
         "SELECT image_paths FROM exercise WHERE source_id=:sourceId",
