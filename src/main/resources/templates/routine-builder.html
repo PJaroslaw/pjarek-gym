@@ -1,0 +1,5 @@
+<!doctype html>
+<html lang="en" xmlns:th="http://www.thymeleaf.org">
+  <head th:replace="~{fragments/layout :: head('Routine builder')}"></head>
+  <body th:replace="~{fragments/layout :: shell('routines', ~{fragments/routine-builder-main :: main})}"></body>
+</html>
