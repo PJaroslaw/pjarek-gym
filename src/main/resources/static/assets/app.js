@@ -127,9 +127,11 @@ document.querySelectorAll('[data-finish-workout]').forEach((form) => {
   });
 });
 
-document.querySelectorAll('[data-exercise-picker]').forEach((picker) => {
+const initializeExercisePicker = (picker) => {
+  if (picker.dataset.initialized) return;
+  picker.dataset.initialized = 'true';
   const search = picker.querySelector('.exercise-picker-search');
-  const selected = picker.querySelector('input[name="exerciseId"]');
+  const selected = picker.querySelector('input[name="exerciseId"], input[data-exercise-id]');
   const results = picker.querySelector('.exercise-picker-results');
   let debounce;
   let activeRequest;
@@ -140,6 +142,25 @@ document.querySelectorAll('[data-exercise-picker]').forEach((picker) => {
     note.className = 'exercise-picker-message';
     note.textContent = message;
     results.append(note);
+  };
+
+  const updateExerciseDetails = (exercise) => {
+    const row = picker.closest('[data-routine-exercise]');
+    const details = row?.querySelector('[data-exercise-details]');
+    if (!details) return;
+    details.querySelector('[data-exercise-muscles]').textContent = exercise?.primaryMuscles || 'Muscles not listed';
+    details.querySelector('[data-exercise-equipment]').textContent = exercise?.equipment || 'Equipment not listed';
+    details.querySelector('[data-exercise-instructions]').textContent =
+      exercise?.instructions || 'No instructions are available for this exercise.';
+    const image = details.querySelector('[data-exercise-image]');
+    if (exercise?.sourceId) {
+      image.src = `/exercise-images/${encodeURIComponent(exercise.sourceId)}/0`;
+      image.hidden = false;
+      image.style.display = '';
+    } else {
+      image.removeAttribute('src');
+      image.hidden = true;
+    }
   };
 
   const searchExercises = async () => {
@@ -175,6 +196,10 @@ document.querySelectorAll('[data-exercise-picker]').forEach((picker) => {
         option.className = 'exercise-picker-option';
         option.setAttribute('role', 'option');
         option.dataset.exerciseId = exercise.id;
+        option.dataset.primaryMuscles = exercise.primary_muscles || '';
+        option.dataset.equipment = exercise.equipment || '';
+        option.dataset.instructions = exercise.instructions || '';
+        option.dataset.sourceId = exercise.source_id || '';
         option.textContent = exercise.name;
         results.append(option);
       });
@@ -186,6 +211,7 @@ document.querySelectorAll('[data-exercise-picker]').forEach((picker) => {
   search.addEventListener('focus', searchExercises);
   search.addEventListener('input', () => {
     selected.value = '';
+    updateExerciseDetails(null);
     clearTimeout(debounce);
     debounce = setTimeout(searchExercises, 180);
   });
@@ -206,6 +232,7 @@ document.querySelectorAll('[data-exercise-picker]').forEach((picker) => {
     if (!option) return;
     search.value = option.textContent.trim();
     selected.value = option.dataset.exerciseId;
+    updateExerciseDetails(option.dataset);
     results.hidden = true;
     search.setAttribute('aria-expanded', 'false');
   });
@@ -217,7 +244,9 @@ document.querySelectorAll('[data-exercise-picker]').forEach((picker) => {
       search.addEventListener('input', () => search.setCustomValidity(''), { once: true });
     }
   });
-});
+};
+
+document.querySelectorAll('[data-exercise-picker]').forEach(initializeExercisePicker);
 
 document.addEventListener('click', (event) => {
   document.querySelectorAll('[data-exercise-picker]').forEach((picker) => {
@@ -225,5 +254,89 @@ document.addEventListener('click', (event) => {
       picker.querySelector('.exercise-picker-results').hidden = true;
       picker.querySelector('.exercise-picker-search').setAttribute('aria-expanded', 'false');
     }
+  });
+});
+
+const routineDraft = document.querySelector('[data-routine-draft]');
+if (routineDraft) {
+  const daysContainer = routineDraft.querySelector('[data-routine-days]');
+  const exerciseTemplate = document.querySelector('#routine-builder-exercise-template');
+  const dayTemplate = document.querySelector('#routine-builder-day-template');
+
+  const renumberDraft = () => {
+    [...daysContainer.querySelectorAll('[data-routine-day]')].forEach((day, dayIndex) => {
+      const dayName = day.querySelector('.routine-draft-day-heading input');
+      dayName.name = `days[${dayIndex}].name`;
+      [...day.querySelectorAll('[data-routine-exercise]')].forEach((exercise, exerciseIndex) => {
+        const inputs = exercise.querySelectorAll('input');
+        const prefix = `days[${dayIndex}].exercises[${exerciseIndex}]`;
+        inputs[0].name = `${prefix}.exerciseName`;
+        inputs[1].name = `${prefix}.exerciseId`;
+        inputs[1].dataset.exerciseId = 'true';
+        inputs[2].name = `${prefix}.sets`;
+        inputs[3].name = `${prefix}.minReps`;
+        inputs[4].name = `${prefix}.maxReps`;
+        inputs[5].name = `${prefix}.restSeconds`;
+        initializeExercisePicker(exercise.querySelector('[data-exercise-picker]'));
+      });
+    });
+  };
+
+  const addExercise = (day) => {
+    const exercise = exerciseTemplate.content.firstElementChild.cloneNode(true);
+    day.querySelector('[data-routine-exercises]').append(exercise);
+    renumberDraft();
+    exercise.querySelector('.exercise-picker-search').focus();
+  };
+
+  routineDraft.addEventListener('click', (event) => {
+    const addDayButton = event.target.closest('[data-add-day]');
+    if (addDayButton) {
+      const day = dayTemplate.content.firstElementChild.cloneNode(true);
+      const index = daysContainer.querySelectorAll('[data-routine-day]').length + 1;
+      day.querySelector('.routine-draft-day-heading input').value = `Day ${index}`;
+      daysContainer.append(day);
+      addExercise(day);
+      day.querySelector('.routine-draft-day-heading input').focus();
+      return;
+    }
+
+    const addExerciseButton = event.target.closest('[data-add-exercise]');
+    if (addExerciseButton) {
+      addExercise(addExerciseButton.closest('[data-routine-day]'));
+      return;
+    }
+
+    const removeExerciseButton = event.target.closest('[data-remove-exercise]');
+    if (removeExerciseButton) {
+      removeExerciseButton.closest('[data-routine-exercise]').remove();
+      renumberDraft();
+      return;
+    }
+
+    const removeDayButton = event.target.closest('[data-remove-day]');
+    if (removeDayButton) {
+      removeDayButton.closest('[data-routine-day]').remove();
+      renumberDraft();
+    }
+  });
+
+  renumberDraft();
+}
+
+document.querySelectorAll('[data-ai-submit]').forEach((button) => {
+  const form = button.closest('[data-ai-progress-form]');
+  if (!form) return;
+
+  form.addEventListener('submit', (event) => {
+    if (event.defaultPrevented || event.submitter !== button) return;
+    const idleLabel = button.querySelector('[data-ai-idle-label]');
+    const pendingLabel = button.querySelector('[data-ai-pending-label]');
+    const progress = form.querySelector('[data-ai-progress]');
+    button.disabled = true;
+    if (idleLabel) idleLabel.hidden = true;
+    if (pendingLabel) pendingLabel.hidden = false;
+    if (progress) progress.hidden = false;
+    form.setAttribute('aria-busy', 'true');
   });
 });

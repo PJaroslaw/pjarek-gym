@@ -1,6 +1,6 @@
 # PJarek Gym Log
 
-A self hosted gym log built with Kotlin, Spring Boot, Thymeleaf, HTMX, and PostgreSQL. It supports user-owned workout routines with rep ranges, guided and ad hoc training sessions, set logging, workout and rest timers, exercise instructions, session history in a calendar, and an admin area.
+A self hosted gym log built with Kotlin, Spring Boot, Thymeleaf, HTMX, and PostgreSQL. It supports user-owned workout routines with rep ranges, AI assisted routine drafts and imports, guided and ad hoc training sessions, set logging, workout and rest timers, exercise instructions, session history in a calendar, and an admin area.
 
 ## Run with Docker Compose
 
@@ -34,7 +34,7 @@ docker compose down
 docker volume ls
 ```
 
-Set `APP_PORT` to change the exposed web port. `APP_EXERCISE_SYNC_CRON` sets the Spring cron schedule (default: Sunday at 04:00), and `APP_EXERCISE_SYNC_ZONE` sets its time zone (default: UTC). Set `APP_EXERCISE_SYNC_ON_STARTUP=false` to skip the initial upstream check; the scheduled checks continue. `APP_EXERCISE_SYNC_URL` can point to a compatible upstream ZIP archive. To create users, sign in as an admin and open **User administration**. New accounts are invite-only. Admins can manage accounts and inspect users' routines and workouts in read-only pages. Personal settings, including weight units and light, dark, or system appearance, are available under **Settings**; system mode follows the device setting.
+Set `APP_PORT` to change the exposed web port. `APP_EXERCISE_SYNC_CRON` sets the Spring cron schedule (default: Sunday at 04:00), and `APP_EXERCISE_SYNC_ZONE` sets its time zone (default: UTC). Set `APP_EXERCISE_SYNC_ON_STARTUP=false` to skip the initial upstream check; the scheduled checks continue. `APP_EXERCISE_SYNC_URL` can point to a compatible upstream ZIP archive. The optional AI routine builder supports OpenAI (`APP_AI_PROVIDER=openai`, with `APP_AI_API_KEY`) and self-hosted Ollama (`APP_AI_PROVIDER=ollama`, with `APP_AI_BASE_URL` and `APP_AI_MODEL`; local Ollama needs no API key). The included Compose Ollama service starts with `docker compose --profile ollama up -d` after setting the Ollama values in `.env`; see [Operations](docs/operations.md#docker-compose) for setup. The builder accepts routine preferences or a PDF/JPEG/PNG/WebP file, keeps its editable draft in the signed-in session, and only stores a routine after the user chooses **Save routine**. Preferences and processed document contents are sent to the configured AI provider; PDFs are converted to text and page images locally, and uploads are not retained. New accounts are invite-only. Admins can manage accounts and inspect users' routines and workouts in read-only pages. Personal settings, including weight units and light, dark, or system appearance, are available under **Settings**; system mode follows the device setting.
 
 ## Local development
 

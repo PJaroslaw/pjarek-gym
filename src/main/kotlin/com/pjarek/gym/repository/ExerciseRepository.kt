@@ -36,6 +36,14 @@ class ExerciseRepository(private val jdbc: NamedParameterJdbcTemplate) {
         "SELECT * FROM exercise WHERE id=:id", mapOf("id" to id)
     )
 
+    fun findActive(ids: Collection<Long>): List<Map<String, Any?>> {
+        if (ids.isEmpty()) return emptyList()
+        return jdbc.query(
+            "SELECT id,name,equipment,primary_muscles,instructions,source_id FROM exercise WHERE active=TRUE AND id IN (:ids)",
+            mapOf("ids" to ids.distinct()), rows
+        )
+    }
+
     fun imagePaths(sourceId: String): String? = jdbc.query(
         "SELECT image_paths FROM exercise WHERE source_id=:sourceId",
         mapOf("sourceId" to sourceId), { rs, _ -> rs.getString("image_paths") }
@@ -49,13 +57,23 @@ class ExerciseRepository(private val jdbc: NamedParameterJdbcTemplate) {
         "SELECT id,name FROM exercise WHERE active=TRUE ORDER BY name", emptyMap<String, Any>(), rows
     )
 
+    fun routineBuilderCatalog(): List<Map<String, Any?>> = jdbc.query(
+        """WITH ranked AS (
+            SELECT id,name,category,equipment,primary_muscles,mechanic,
+                   row_number() OVER (PARTITION BY equipment,primary_muscles ORDER BY name,id) AS choice
+            FROM exercise WHERE active=TRUE
+        )
+        SELECT id,name,category,equipment,primary_muscles,mechanic FROM ranked WHERE choice<=2 ORDER BY md5(id::text)""",
+        emptyMap<String, Any>(), rows
+    )
+
     fun library(): List<Map<String, Any?>> = jdbc.query(
         "SELECT e.id,e.name,e.category,e.equipment,e.primary_muscles,e.source_id FROM exercise e WHERE e.active=TRUE ORDER BY e.name LIMIT 200",
         emptyMap<String, Any>(), rows
     )
 
     fun searchPicker(query: String, terms: List<String>): List<Map<String, Any?>> =
-        search(query, terms, listOf("e.name"), "e.id,e.name", 100)
+        search(query, terms, listOf("e.name"), "e.id,e.name,e.equipment,e.primary_muscles,e.instructions,e.source_id", 100)
 
     fun searchLibrary(query: String, terms: List<String>): List<Map<String, Any?>> =
         search(query, terms, listOf("e.name", "e.primary_muscles", "e.equipment"),
